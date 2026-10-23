@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -29,16 +29,29 @@ class SyncEvent:
     def content_hash(self) -> str:
         payload = "|".join(
             [
-                self.summary.strip(),
-                self.start.isoformat(),
-                self.end.isoformat(),
+                _norm_str(self.summary),
+                _norm_dt(self.start, self.all_day),
+                _norm_dt(self.end, self.all_day),
                 "1" if self.all_day else "0",
-                self.location.strip(),
-                self.description.strip(),
+                _norm_str(self.location),
+                _norm_str(self.description),
                 _normalize_recurrence(self.recurrence),
             ]
         )
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _norm_str(s: str) -> str:
+    return (s or "").strip().replace("\r\n", "\n")
+
+
+def _norm_dt(dt: datetime, all_day: bool) -> str:
+    if all_day:
+        return dt.date().isoformat()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    utc = dt.astimezone(timezone.utc).replace(microsecond=0)
+    return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _normalize_recurrence(lines: list[str]) -> str:
