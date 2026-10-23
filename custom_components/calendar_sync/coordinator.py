@@ -94,13 +94,17 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         )
         for e in google_events.values():
             _LOGGER.info(
-                "  G[%s] '%s' hash=%s rec=%s",
-                e.google_id[:8], e.summary, e.content_hash()[:8], e.recurrence,
+                "  G[%s] '%s' h=%s start=%s end=%s ad=%s loc=%r desc=%r rec=%s",
+                e.google_id[:8], e.summary, e.content_hash()[:8],
+                e.start.isoformat(), e.end.isoformat(), e.all_day,
+                e.location, e.description, e.recurrence,
             )
         for e in icloud_events.values():
             _LOGGER.info(
-                "  I[%s] '%s' hash=%s rec=%s",
-                (e.icloud_uid or "")[:8], e.summary, e.content_hash()[:8], e.recurrence,
+                "  I[%s] '%s' h=%s start=%s end=%s ad=%s loc=%r desc=%r rec=%s",
+                (e.icloud_uid or "")[:8], e.summary, e.content_hash()[:8],
+                e.start.isoformat(), e.end.isoformat(), e.all_day,
+                e.location, e.description, e.recurrence,
             )
 
         stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0}
