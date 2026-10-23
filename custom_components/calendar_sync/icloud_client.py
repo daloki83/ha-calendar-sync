@@ -6,8 +6,10 @@ Nutzt die `caldav`-Lib. Blockierende Aufrufe werden vom Coordinator per
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import caldav
 from caldav.lib.error import NotFoundError
@@ -17,6 +19,16 @@ from .const import ICLOUD_CALDAV_URL
 from .models import SyncEvent
 
 _LOGGER = logging.getLogger(__name__)
+
+# Nur einzeilige RRULE/RDATE/EXDATE-Zeilen zulassen (verhindert iCal-Injection)
+_RECURRENCE_LINE = re.compile(r"^(RRULE|RDATE|EXDATE)(;[^:\r\n]*)?:[^\r\n]+$", re.IGNORECASE)
+
+
+def _safe_recurrence(lines: list[str]) -> list[str]:
+    safe = [ln for ln in lines if _RECURRENCE_LINE.match(ln)]
+    if len(safe) != len(lines):
+        _LOGGER.warning("Ungültige Serienregel-Zeilen verworfen: %d", len(lines) - len(safe))
+    return safe
 
 
 def _zoneinfo(name: str):
@@ -171,10 +183,17 @@ class ICloudClient:
             )
 
     def _absolute_url(self, href: str) -> str:
-        if href.startswith("http"):
-            return href
-        base = ICLOUD_CALDAV_URL.rstrip("/")
-        return base + ("/" + href.lstrip("/"))
+        if not href.startswith("http"):
+            base = ICLOUD_CALDAV_URL.rstrip("/")
+            return base + ("/" + href.lstrip("/"))
+        # Zugangsdaten nur an iCloud-Hosts senden
+        parsed = urlparse(href)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or not (
+            host == "icloud.com" or host.endswith(".icloud.com")
+        ):
+            raise RuntimeError(f"Unerwarteter CalDAV-Host verweigert: {host}")
+        return href
 
     def delete_event(self, href: str) -> None:
         """Direktes CalDAV-DELETE auf die Event-URL."""
@@ -229,13 +248,14 @@ class ICloudClient:
         vevent.add("last-modified", datetime.now(timezone.utc))
         cal.add_component(vevent)
         ical_text = cal.to_ical().decode("utf-8")
-        if ev.recurrence:
+        recurrence = _safe_recurrence(ev.recurrence)
+        if recurrence:
             # Zeilen vor END:VEVENT einfügen
             lines = ical_text.splitlines()
             out: list[str] = []
             for line in lines:
                 if line.startswith("END:VEVENT"):
-                    out.extend(ev.recurrence)
+                    out.extend(recurrence)
                 out.append(line)
             ical_text = "\r\n".join(out) + "\r\n"
         return ical_text
