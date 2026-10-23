@@ -7,6 +7,7 @@ from datetime import timedelta
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.exceptions import Unauthorized
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers import config_validation as cv
 
@@ -55,6 +56,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if not hass.services.has_service(DOMAIN, "remove_duplicates"):
         async def _handle_remove_duplicates(call: ServiceCall) -> ServiceResponse:
+            if call.context.user_id:
+                user = await hass.auth.async_get_user(call.context.user_id)
+                if user is None or not user.is_admin:
+                    raise Unauthorized(context=call.context)
             dry_run = call.data.get("dry_run", True)
             results = {}
             for entry_id, coord in hass.data.get(DOMAIN, {}).items():
