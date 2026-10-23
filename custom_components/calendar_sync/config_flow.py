@@ -14,6 +14,7 @@ from .const import (
     CONF_ICLOUD_PASSWORD,
     CONF_ICLOUD_USERNAME,
     CONF_SCAN_INTERVAL,
+    CONF_SYNC_ENABLED,
     CONF_TOKEN,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -126,6 +127,7 @@ class CalendarSyncOAuth2FlowHandler(
                     CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
                     CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    CONF_SYNC_ENABLED: user_input[CONF_SYNC_ENABLED],
                 },
             )
 
@@ -150,6 +152,7 @@ class CalendarSyncOAuth2FlowHandler(
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                 ): int,
+                vol.Optional(CONF_SYNC_ENABLED, default=False): bool,
             }
         )
         return self.async_show_form(step_id="pick", data_schema=schema)

@@ -15,6 +15,7 @@ from .const import (
     CONF_ICLOUD_CALENDAR,
     CONF_ICLOUD_PASSWORD,
     CONF_ICLOUD_USERNAME,
+    CONF_SYNC_ENABLED,
     DB_FILENAME,
     DOMAIN,
 )
@@ -52,6 +53,9 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         self._db: MappingDB | None = None
 
     async def _async_update_data(self) -> dict:
+        if not self._entry.data.get(CONF_SYNC_ENABLED, False):
+            _LOGGER.debug("Sync ist deaktiviert – überspringe Lauf")
+            return {"paused": True}
         try:
             await self._oauth.async_ensure_token_valid()
             token_data = self._oauth.token

@@ -8,6 +8,7 @@ CONF_ICLOUD_PASSWORD = "icloud_password"
 CONF_ICLOUD_CALENDAR = "icloud_calendar"
 CONF_GOOGLE_CALENDAR_ID = "google_calendar_id"
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_SYNC_ENABLED = "sync_enabled"
 
 DEFAULT_SCAN_INTERVAL = 300  # 5 Minuten
 
