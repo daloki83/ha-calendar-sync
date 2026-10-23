@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Calendar Sync",
+        "description": "Connect your iCloud family calendar. Google will be connected in a later step.",
+        "data": {
+          "icloud_username": "Apple ID (email)",
+          "icloud_password": "App-specific password",
+          "icloud_calendar": "iCloud calendar name",
+          "google_calendar_id": "Google calendar ID (used later; 'primary' = main calendar)",
+          "scan_interval": "Sync interval in seconds"
+        }
+      }
+    },
+    "error": {
+      "icloud_auth": "iCloud login failed or calendar not found"
+    },
+    "abort": {
+      "already_configured": "This calendar is already configured"
+    }
+  }
+}
