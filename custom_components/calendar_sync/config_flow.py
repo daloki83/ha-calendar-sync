@@ -56,7 +56,11 @@ class CalendarSyncOAuth2FlowHandler(
     async def async_oauth_create_entry(
         self, data: dict[str, Any]
     ) -> ConfigFlowResult:
-        """Google-Token ist da – weiter zu iCloud."""
+        """Google-Token ist da – weiter zu iCloud.
+
+        `data` enthält hier bereits {"auth_implementation": ..., "token": {...}}.
+        Wir reichen den ganzen Block zum Eintrag weiter.
+        """
         self._token_data = data
         try:
             self._google_calendars = await self.hass.async_add_executor_job(
@@ -115,7 +119,8 @@ class CalendarSyncOAuth2FlowHandler(
                     f"{_google_label(self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID])}"
                 ),
                 data={
-                    CONF_TOKEN: self._token_data,
+                    # auth_implementation + token aus dem OAuth-Flow übernehmen
+                    **self._token_data,
                     CONF_ICLOUD_USERNAME: self._icloud_user,
                     CONF_ICLOUD_PASSWORD: self._icloud_pw,
                     CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
