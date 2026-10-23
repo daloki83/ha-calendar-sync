@@ -148,9 +148,11 @@ class GoogleClient:
                 "end": {"date": ev.end.date().isoformat()},
             }
         else:
+            start = ev.start if ev.start.tzinfo else ev.start.replace(tzinfo=timezone.utc)
+            end = ev.end if ev.end.tzinfo else ev.end.replace(tzinfo=timezone.utc)
             body_time = {
-                "start": {"dateTime": ev.start.isoformat()},
-                "end": {"dateTime": ev.end.isoformat()},
+                "start": {"dateTime": start.isoformat(), "timeZone": "UTC"},
+                "end": {"dateTime": end.isoformat(), "timeZone": "UTC"},
             }
         return {
             "summary": ev.summary,
