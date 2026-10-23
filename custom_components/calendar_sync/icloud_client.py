@@ -115,14 +115,34 @@ class ICloudClient:
         return uid, _href_of(dav_event)
 
     def update_event(self, href: str, ev: SyncEvent, uid: str) -> None:
-        """Event per UID löschen und neu speichern (umgeht ETag-412)."""
-        assert self._calendar is not None
-        try:
-            existing = self._calendar.event_by_uid(uid)
-            existing.delete()
-        except NotFoundError:
-            pass
-        self._calendar.save_event(self._build_ical(ev, uid))
+        """Direkter CalDAV-PUT auf die bekannte Event-URL ohne ETag-Check."""
+        assert self._client is not None and self._calendar is not None
+        ical = self._build_ical(ev, uid)
+        if not href:
+            # Fallback: Lookup per UID, dann PUT auf dessen URL
+            try:
+                existing = self._calendar.event_by_uid(uid)
+                href = _href_of(existing)
+            except NotFoundError:
+                self._calendar.save_event(ical)
+                return
+        url = self._absolute_url(href)
+        resp = self._client.session.request(
+            "PUT",
+            url,
+            data=ical.encode("utf-8"),
+            headers={"Content-Type": "text/calendar; charset=utf-8"},
+        )
+        if resp.status_code >= 400:
+            raise RuntimeError(
+                f"iCloud PUT {url} fehlgeschlagen: HTTP {resp.status_code}"
+            )
+
+    def _absolute_url(self, href: str) -> str:
+        if href.startswith("http"):
+            return href
+        base = ICLOUD_CALDAV_URL.rstrip("/")
+        return base + ("/" + href.lstrip("/"))
 
     def delete_event(self, href: str) -> None:
         assert self._calendar is not None
