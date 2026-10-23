@@ -4,9 +4,11 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers import config_validation as cv
 
 from pathlib import Path
 
@@ -50,6 +52,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
+    if not hass.services.has_service(DOMAIN, "remove_duplicates"):
+        async def _handle_remove_duplicates(call: ServiceCall) -> ServiceResponse:
+            dry_run = call.data.get("dry_run", True)
+            results = {}
+            for entry_id, coord in hass.data.get(DOMAIN, {}).items():
+                results[entry_id] = await coord.async_remove_duplicates(dry_run)
+            return results
+
+        hass.services.async_register(
+            DOMAIN,
+            "remove_duplicates",
+            _handle_remove_duplicates,
+            schema=vol.Schema({vol.Optional("dry_run", default=True): cv.boolean}),
+            supports_response=SupportsResponse.OPTIONAL,
+        )
     return True
 
 

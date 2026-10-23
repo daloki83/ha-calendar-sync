@@ -1,0 +1,6 @@
+remove_duplicates:
+  fields:
+    dry_run:
+      default: true
+      selector:
+        boolean:

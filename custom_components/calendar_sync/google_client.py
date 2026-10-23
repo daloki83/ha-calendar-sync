@@ -120,6 +120,11 @@ class GoogleClient:
             timezone=tz_name,
             updated=updated,
             google_id=item["id"],
+            extra={
+                "ours": item.get("extendedProperties", {})
+                .get("private", {})
+                .get("calendar_sync") == "1"
+            },
         )
 
     # ---------- Write ----------
@@ -167,4 +172,5 @@ class GoogleClient:
         }
         if ev.recurrence:
             body["recurrence"] = list(ev.recurrence)
+        body["extendedProperties"] = {"private": {"calendar_sync": "1"}}
         return body

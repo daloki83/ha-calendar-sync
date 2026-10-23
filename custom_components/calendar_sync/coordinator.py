@@ -101,11 +101,32 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             len(google_events), len(icloud_events),
         )
 
-        stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0}
+        stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0, "matched": 0}
+
+        # Ungemappte iCloud-Events nach Inhalt indexieren, damit identische
+        # Termine verknüpft statt kopiert werden (verhindert Duplikate nach
+        # Kalenderwechsel / leerer Mapping-DB).
+        mapped_i = {m.icloud_uid for m in self._db.all()}
+        i_by_hash: dict[str, list[SyncEvent]] = {}
+        for uid, e in icloud_events.items():
+            if uid not in mapped_i:
+                i_by_hash.setdefault(e.content_hash(), []).append(e)
 
         for gid, gev in google_events.items():
             mapping = self._db.get_by_google(gid)
             if mapping is None:
+                twins = i_by_hash.get(gev.content_hash())
+                if twins:
+                    iev = twins.pop(0)
+                    self._db.upsert(Mapping(
+                        google_id=gid, icloud_uid=iev.icloud_uid,
+                        icloud_href=iev.extra.get("href", ""),
+                        google_updated=_iso(gev.updated),
+                        icloud_updated=_iso(iev.updated),
+                        content_hash=gev.content_hash(),
+                    ))
+                    stats["matched"] += 1
+                    continue
                 uid, href = self._icloud.create_event(gev)
                 self._db.upsert(Mapping(
                     google_id=gid, icloud_uid=uid, icloud_href=href,
@@ -183,6 +204,65 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             content_hash=new_hash,
         ))
         stats["updated"] += 1
+
+    async def async_remove_duplicates(self, dry_run: bool) -> dict:
+        await self._oauth.async_ensure_token_valid()
+        return await self.hass.async_add_executor_job(
+            self._dedupe, self._oauth.token, dry_run
+        )
+
+    def _dedupe(self, token_data: dict, dry_run: bool) -> dict:
+        """Löscht nur von der Integration erzeugte Kopien, die exakte Duplikate sind."""
+        if self._db is None:
+            self._db = MappingDB(self._db_path)
+        self._icloud.connect()
+        creds = build_credentials({"token": token_data})
+        google = GoogleClient.from_credentials(creds, calendar_id=self._calendar_id)
+
+        mappings = self._db.all()
+        google_copies = {
+            m.google_id for m in mappings if not m.icloud_uid.endswith("@calendar-sync")
+        }
+
+        result: dict = {"dry_run": dry_run, "google": [], "icloud": []}
+
+        g_groups: dict[str, list[SyncEvent]] = {}
+        for e in google.fetch_events():
+            g_groups.setdefault(e.content_hash(), []).append(e)
+        for events in g_groups.values():
+            if len(events) < 2:
+                continue
+            ours = [e for e in events if e.extra.get("ours") or e.google_id in google_copies]
+            originals = [e for e in events if e not in ours]
+            doomed = ours if originals else ours[1:]
+            for e in doomed:
+                result["google"].append(f"{e.summary} @ {e.start.isoformat()}")
+                if not dry_run:
+                    google.delete_event(e.google_id)
+                    self._db.delete_by_google(e.google_id)
+
+        i_groups: dict[str, list[SyncEvent]] = {}
+        for e in self._icloud.fetch_events():
+            i_groups.setdefault(e.content_hash(), []).append(e)
+        for events in i_groups.values():
+            if len(events) < 2:
+                continue
+            ours = [e for e in events if (e.icloud_uid or "").endswith("@calendar-sync")]
+            originals = [e for e in events if e not in ours]
+            doomed = ours if originals else ours[1:]
+            for e in doomed:
+                result["icloud"].append(f"{e.summary} @ {e.start.isoformat()}")
+                if not dry_run:
+                    self._icloud.delete_event(e.extra.get("href", ""))
+                    self._db.delete_by_icloud(e.icloud_uid)
+
+        result["google_count"] = len(result["google"])
+        result["icloud_count"] = len(result["icloud"])
+        _LOGGER.info(
+            "Duplikat-Bereinigung (dry_run=%s): %d Google, %d iCloud",
+            dry_run, result["google_count"], result["icloud_count"],
+        )
+        return result
 
 
 def _iso(dt: datetime | None) -> str:
