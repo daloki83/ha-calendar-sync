@@ -102,10 +102,12 @@ class GoogleClient:
             all_day = True
             start = datetime.fromisoformat(start_raw["date"]).replace(tzinfo=timezone.utc)
             end = datetime.fromisoformat(end_raw["date"]).replace(tzinfo=timezone.utc)
+            tz_name = ""
         else:
             all_day = False
             start = datetime.fromisoformat(start_raw["dateTime"].replace("Z", "+00:00"))
             end = datetime.fromisoformat(end_raw["dateTime"].replace("Z", "+00:00"))
+            tz_name = start_raw.get("timeZone", "") or end_raw.get("timeZone", "")
         updated = datetime.fromisoformat(item["updated"].replace("Z", "+00:00"))
         return SyncEvent(
             summary=item.get("summary", ""),
@@ -115,6 +117,7 @@ class GoogleClient:
             location=item.get("location", ""),
             description=item.get("description", ""),
             recurrence=list(item.get("recurrence", [])),
+            timezone=tz_name,
             updated=updated,
             google_id=item["id"],
         )
@@ -151,9 +154,10 @@ class GoogleClient:
         else:
             start = ev.start if ev.start.tzinfo else ev.start.replace(tzinfo=timezone.utc)
             end = ev.end if ev.end.tzinfo else ev.end.replace(tzinfo=timezone.utc)
+            tz = ev.timezone or "UTC"
             body_time = {
-                "start": {"dateTime": start.isoformat(), "timeZone": "UTC"},
-                "end": {"dateTime": end.isoformat(), "timeZone": "UTC"},
+                "start": {"dateTime": start.isoformat(), "timeZone": tz},
+                "end": {"dateTime": end.isoformat(), "timeZone": tz},
             }
         body = {
             "summary": ev.summary,
