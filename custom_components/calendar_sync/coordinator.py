@@ -85,6 +85,14 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
 
         icloud_events = {e.icloud_uid: e for e in self._icloud.fetch_events()}
         google_events = {e.google_id: e for e in google.fetch_events()}
+        _LOGGER.info(
+            "Fetched: %d Google / %d iCloud events",
+            len(google_events), len(icloud_events),
+        )
+        for e in google_events.values():
+            _LOGGER.info("  G: '%s' hash=%s", e.summary, e.content_hash()[:8])
+        for e in icloud_events.values():
+            _LOGGER.info("  I: '%s' hash=%s", e.summary, e.content_hash()[:8])
 
         stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0}
 
