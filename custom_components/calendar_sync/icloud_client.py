@@ -115,15 +115,14 @@ class ICloudClient:
         return uid, _href_of(dav_event)
 
     def update_event(self, href: str, ev: SyncEvent, uid: str) -> None:
-        """Event per UID holen und mit neuem iCal überschreiben."""
+        """Event per UID löschen und neu speichern (umgeht ETag-412)."""
         assert self._calendar is not None
         try:
             existing = self._calendar.event_by_uid(uid)
+            existing.delete()
         except NotFoundError:
-            self.create_event(ev)
-            return
-        existing.data = self._build_ical(ev, uid)
-        existing.save()
+            pass
+        self._calendar.save_event(self._build_ical(ev, uid))
 
     def delete_event(self, href: str) -> None:
         assert self._calendar is not None
