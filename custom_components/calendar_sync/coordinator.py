@@ -59,9 +59,11 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         try:
             await self._oauth.async_ensure_token_valid()
             token_data = self._oauth.token
-            return await self.hass.async_add_executor_job(
+            stats = await self.hass.async_add_executor_job(
                 self._sync_once, token_data
             )
+            _LOGGER.info("Sync-Lauf fertig: %s", stats)
+            return stats
         except Exception as err:
             raise UpdateFailed(f"Sync fehlgeschlagen: {err}") from err
 
@@ -143,10 +145,18 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             return
         g_time = gev.updated or datetime.now(timezone.utc)
         i_time = iev.updated or datetime.now(timezone.utc)
+        _LOGGER.info(
+            "Reconcile %s: g_hash=%s i_hash=%s stored=%s g_time=%s i_time=%s",
+            gev.summary or iev.summary,
+            g_hash[:8], i_hash[:8], mapping.content_hash[:8],
+            g_time, i_time,
+        )
         if g_time >= i_time:
+            _LOGGER.info("→ Google gewinnt, update iCloud")
             self._icloud.update_event(mapping.icloud_href, gev, mapping.icloud_uid)
             new_hash = g_hash
         else:
+            _LOGGER.info("→ iCloud gewinnt, update Google")
             google.update_event(mapping.google_id, iev)
             new_hash = i_hash
         self._db.upsert(Mapping(
