@@ -7,7 +7,7 @@
       },
       "icloud": {
         "title": "Sign in to iCloud",
-        "description": "Create an app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords.",
+        "description": "Create an app-specific password at account.apple.com → Sign-In and Security → App-Specific Passwords.",
         "data": {
           "icloud_username": "Apple ID (email)",
           "icloud_password": "App-specific password"
@@ -20,13 +20,15 @@
           "icloud_calendar": "iCloud calendar",
           "google_calendar_id": "Google calendar",
           "scan_interval": "Sync interval in seconds",
-          "sync_enabled": "Enable synchronization (leave OFF initially for testing)"
+          "sync_enabled": "Enable synchronization (leave OFF initially for testing)",
+          "confirm_shared": "I understand the risk and want to continue anyway"
         }
       }
     },
     "error": {
       "icloud_auth": "iCloud login failed – check credentials",
-      "no_calendars": "No calendars found"
+      "no_calendars": "No calendars found",
+      "calendar_in_use": "One of these calendars is already synced by the entry \"{conflict}\". Two entries on the same calendar can create or delete each other's events. Recommendation: remove the other entry first. Confirm below to continue."
     },
     "abort": {
       "already_configured": "This calendar combination is already configured",
@@ -49,20 +51,57 @@
         "data": {
           "sync_enabled": "Sync enabled",
           "scan_interval": "Sync interval in seconds",
-          "change_calendars": "Change calendars (next step – resets mapping)"
+          "delete_threshold": "Deletion brake: ask for approval above this many deletions per run",
+          "change_calendars": "Change calendars (next step – resets mappings)"
         }
       },
       "pick_calendars": {
         "title": "Change calendars",
-        "description": "Note: changing calendars will reset the mapping database.",
+        "description": "Mappings will be reset. The next run re-links identical events and deletes nothing.",
         "data": {
           "icloud_calendar": "iCloud calendar",
-          "google_calendar_id": "Google calendar"
+          "google_calendar_id": "Google calendar",
+          "confirm_shared": "I understand the risk and want to continue anyway"
         }
       }
     },
+    "error": {
+      "calendar_in_use": "One of these calendars is already synced by the entry \"{conflict}\". Two entries on the same calendar can create or delete each other's events. Recommendation: remove the other entry first. Confirm below to continue."
+    },
     "abort": {
       "refetch_failed": "Could not reload calendars"
+    }
+  },
+  "issues": {
+    "pending_deletions": {
+      "title": "Calendar Sync: {count} deletions awaiting approval ({title})",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "{count} events would be deleted",
+            "description": "The sync would delete these events because they are missing on the other side. That is more than the configured deletion brake allows. Nothing is deleted until you decide.\n\n{events}\n\n**Approve deletion:** the events are deleted on the next run.\n**Restore:** the events are not deleted but re-created on the side where they are missing.",
+            "menu_options": {
+              "approve": "Approve deletion",
+              "restore": "Don't delete – restore missing events"
+            }
+          }
+        },
+        "abort": {
+          "no_pending": "No deletions are awaiting approval anymore."
+        }
+      }
+    }
+  },
+  "services": {
+    "remove_duplicates": {
+      "name": "Remove duplicates",
+      "description": "Removes identical events that were created by this integration. Administrators only.",
+      "fields": {
+        "dry_run": {
+          "name": "Dry run",
+          "description": "Only report what would be deleted (default: on)."
+        }
+      }
     }
   },
   "application_credentials": {

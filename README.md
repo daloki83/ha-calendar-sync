@@ -181,12 +181,33 @@ Sync-Lauf: {'created_g': 0, 'created_i': 0, 'updated': 0, 'deleted': 0, 'matched
 
 - **Synchronisation aktiv** – Sync pausieren oder fortsetzen. Pausiert wird nichts gelesen oder geschrieben.
 - **Sync-Intervall in Sekunden**
+- **Löschbremse** – ab wie vielen Löschungen pro Lauf um Freigabe gebeten wird (Standard 5, siehe unten).
 - **Kalender wechseln** – Haken setzen → **OK** → im nächsten Schritt neue Kalender wählen.
-  - Die interne Zuordnungsliste wird dabei geleert.
-  - Der nächste Lauf verknüpft gleiche Termine, statt sie zu kopieren (ab v0.4.5).
+  - Die Zuordnungen dieses Eintrags werden dabei geleert.
+  - Der nächste Lauf verknüpft gleiche Termine neu und **löscht nichts**.
   - Der Name des Eintrags wird automatisch angepasst.
 
 Ein Neu-Einrichten ist für diese Änderungen nicht nötig.
+
+### Löschschutz
+
+Seit v1.1 schützen mehrere Stufen davor, dass versehentlich viele Termine gelöscht werden:
+
+| Schutz | Was passiert |
+|---|---|
+| **Zuordnung pro Eintrag** | Jeder Eintrag hat eine eigene Zuordnungsliste, gebunden an genau sein Kalenderpaar. Ein neuer oder geänderter Eintrag erbt nie fremde Zuordnungen. |
+| **Erster Lauf** | Der erste Lauf eines Eintrags (oder nach einem Kalenderwechsel) verknüpft und legt an, löscht aber nie. |
+| **Leerer Kalender** | Liefert eine Seite 0 Termine, obwohl mindestens 3 zugeordnet sind, bricht der Lauf ab, ohne etwas zu ändern. |
+| **Löschbremse** | Würde ein Lauf mehr als 5 Termine (einstellbar) oder mehr als 20 % aller zugeordneten Termine löschen, wird **nichts** gelöscht. Anlegen und Ändern laufen normal weiter. |
+| **Doppelt belegter Kalender** | Beim Einrichten erscheint eine Warnung, wenn ein Kalender schon von einem anderen Eintrag genutzt wird. Fortfahren nur mit Bestätigung. |
+
+**Wenn die Löschbremse greift:**
+
+1. Unter **Einstellungen → System → Reparaturen** erscheint „Calendar Sync: N Löschungen warten auf Freigabe“.
+2. Anklicken → du siehst die Liste der betroffenen Termine.
+3. Entscheiden:
+   - **Löschen freigeben** – die Termine werden gelöscht (z. B. wenn du absichtlich viele Termine entfernt hast).
+   - **Nicht löschen – fehlende Termine wiederherstellen** – die Termine bleiben und werden auf der Seite, auf der sie fehlen, neu angelegt.
 
 ---
 
@@ -241,13 +262,14 @@ Nur **Administratoren** dürfen den Dienst ausführen.
 6. Kalender in der Apple- und Google-App prüfen.
 7. **Sync wieder einschalten.** Der nächste Lauf verknüpft die übrigen Termine (`matched`).
 
-> ⚠️ Gelöschte Termine sind weg. Google behält sie etwa 30 Tage im Papierkorb des Kalenders; iCloud kann Kalender über **account.apple.com → Daten wiederherstellen** auf einen früheren Stand zurücksetzen. Den Probelauf deshalb nie überspringen.
+> ⚠️ Gelöschte Termine sind weg. Google behält sie etwa 30 Tage im Papierkorb des Kalenders; iCloud kann Kalender über **icloud.com → Einstellungen → Kalender wiederherstellen** auf einen früheren Stand zurücksetzen. Den Probelauf deshalb nie überspringen.
 
 ---
 
 ## 10. So funktioniert der Sync
 
-- **Zuordnungsliste:** Eine SQLite-Datei unter `config/calendar_sync/calendar_sync_mapping.db` merkt sich, welcher Google-Termin zu welchem iCloud-Termin gehört, plus einen Prüfwert (Hash) des zuletzt synchronisierten Inhalts.
+- **Zuordnungsliste:** Pro Eintrag eine SQLite-Datei unter `config/calendar_sync/<entry_id>.db`. Sie merkt sich, welcher Google-Termin zu welchem iCloud-Termin gehört, plus einen Prüfwert (Hash) des zuletzt synchronisierten Inhalts, und für welches Kalenderpaar die Zuordnungen gelten.
+- **Löschungen werden erst geplant**, dann gegen den Löschschutz geprüft (siehe Kapitel 8) und erst danach ausgeführt.
 - **Änderungserkennung:** Pro Lauf werden beide Seiten gelesen und Hashes verglichen. Zeiten werden dafür auf UTC normalisiert, Serienregeln vereinheitlicht – so erzeugen unterschiedliche Schreibweisen von Google und Apple keine Scheinänderungen.
 - **Löschungen:** Fehlt ein bereits verknüpfter Termin auf einer Seite, wird er auf der anderen Seite ebenfalls gelöscht.
 - **Herkunftsmarkierung:** In iCloud angelegte Kopien haben eine UID mit `@calendar-sync`, in Google angelegte Kopien eine unsichtbare Eigenschaft `calendar_sync=1`.
@@ -269,6 +291,9 @@ Für Details pro Termin: Integration → **⋮** → **Debug-Protokollierung akt
 | Google-Anmeldung abgelaufen | OAuth-App im Status „Testing" | in HA neu anmelden |
 | Termine doppelt | siehe Kapitel 9 | `calendar_sync.remove_duplicates` |
 | Serientermin um 1 h verschoben (Sommer-/Winterzeit) | Version vor 0.3.5 | auf aktuelle Version aktualisieren |
+| Reparatur „N Löschungen warten auf Freigabe“ | Löschbremse hat gegriffen | Liste prüfen, freigeben oder wiederherstellen (Kapitel 8) |
+| „…-Kalender liefert 0 Termine, obwohl N zugeordnet sind“ | Abruffehler, falscher Kalender oder abgelaufene Anmeldung | Kalender in der App prüfen, ggf. neu anmelden. Wurde der Kalender absichtlich geleert: Sync pausieren, unter „Kalender wechseln“ neu wählen |
+| Viele Termine versehentlich gelöscht | – | iCloud: icloud.com → Einstellungen → Kalender wiederherstellen. Google: Kalender → Papierkorb |
 
 ---
 
@@ -475,12 +500,33 @@ Sync-Lauf: {'created_g': 0, 'created_i': 0, 'updated': 0, 'deleted': 0, 'matched
 
 - **Sync enabled** – pause or resume. When paused, nothing is read or written.
 - **Sync interval in seconds**
+- **Deletion brake** – above how many deletions per run approval is required (default 5, see below).
 - **Change calendars** – tick → **OK** → pick new calendars in the next step.
-  - The internal mapping list is cleared.
-  - The next run links identical events instead of copying them (as of v0.4.5).
+  - This entry's mappings are cleared.
+  - The next run re-links identical events and **deletes nothing**.
   - The entry's name is updated automatically.
 
 Reinstalling the integration is not needed for these changes.
+
+### Deletion protection
+
+Since v1.1, several layers protect against accidentally deleting many events:
+
+| Protection | What happens |
+|---|---|
+| **Mappings per entry** | Each entry has its own mapping list, bound to exactly its calendar pair. A new or changed entry never inherits someone else's mappings. |
+| **First run** | The first run of an entry (or after a calendar switch) links and creates, but never deletes. |
+| **Empty calendar** | If one side returns 0 events although at least 3 are mapped, the run aborts without changing anything. |
+| **Deletion brake** | If a run would delete more than 5 events (configurable) or more than 20 % of all mapped events, **nothing** is deleted. Creating and updating keep working. |
+| **Calendar used twice** | During setup, a warning appears if a calendar is already used by another entry. You can only continue after confirming. |
+
+**When the deletion brake kicks in:**
+
+1. Under **Settings → System → Repairs**, "Calendar Sync: N deletions awaiting approval" appears.
+2. Click it → you see the list of affected events.
+3. Decide:
+   - **Approve deletion** – the events are deleted (e.g. if you intentionally removed many events).
+   - **Don't delete – restore missing events** – the events stay and are re-created on the side where they are missing.
 
 ---
 
@@ -535,13 +581,14 @@ Only **administrators** may run the service.
 6. Check the calendar in the Apple and Google apps.
 7. **Re-enable sync.** The next run links the remaining events (`matched`).
 
-> ⚠️ Deleted events are gone. Google keeps them in the calendar's trash for about 30 days; iCloud can restore calendars to an earlier state via **account.apple.com → Data recovery**. Never skip the dry run.
+> ⚠️ Deleted events are gone. Google keeps them in the calendar's trash for about 30 days; iCloud can restore calendars to an earlier state via **icloud.com → Settings → Restore calendars**. Never skip the dry run.
 
 ---
 
 ## 10. How the sync works
 
-- **Mapping list:** A SQLite file at `config/calendar_sync/calendar_sync_mapping.db` remembers which Google event matches which iCloud event, plus a checksum (hash) of the last synced content.
+- **Mapping list:** One SQLite file per entry at `config/calendar_sync/<entry_id>.db`. It remembers which Google event matches which iCloud event, a checksum (hash) of the last synced content, and which calendar pair the mappings belong to.
+- **Deletions are planned first**, checked against the deletion protection (see chapter 8), and only then executed.
 - **Change detection:** On every run, both sides are read and hashes compared. Times are normalized to UTC and recurrence rules canonicalized – so different notations by Google and Apple do not produce fake changes.
 - **Deletions:** If an already-linked event is missing on one side, it is also deleted on the other.
 - **Origin marker:** Copies created in iCloud have a UID with `@calendar-sync`; copies created in Google have an invisible property `calendar_sync=1`.
@@ -563,6 +610,9 @@ For per-event detail: Integration → **⋮** → **Enable debug logging**.
 | Google login expired | OAuth app in "Testing" status | Sign in again in HA |
 | Duplicate events | See chapter 9 | `calendar_sync.remove_duplicates` |
 | Recurring event shifted by 1 h (DST) | Version before 0.3.5 | Update to the current version |
+| Repair "N deletions awaiting approval" | Deletion brake kicked in | Review the list, approve or restore (chapter 8) |
+| "…calendar returns 0 events although N are mapped" | Fetch error, wrong calendar, or expired login | Check the calendar in the app, sign in again if needed. If you emptied the calendar on purpose: pause sync, re-select under "Change calendars" |
+| Many events deleted by accident | – | iCloud: icloud.com → Settings → Restore calendars. Google: Calendar → Trash |
 
 ---
 

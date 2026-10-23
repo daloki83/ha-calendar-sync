@@ -2,6 +2,19 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.1.0 – Löschschutz
+
+**Vorfall:** Nach dem Einrichten eines zweiten Eintrags (gleicher iCloud-Kalender „Familie“, neuer, leerer Google-Kalender) löschte der erste Lauf 38 Termine aus dem iCloud-Kalender. Wiederhergestellt über iCloud.com → Kalender wiederherstellen.
+
+**Ursache:** Alle Einträge teilten sich eine Zuordnungs-DB. Der neue Eintrag erbte die Zuordnungen des alten Testpaars; da die zugeordneten Google-Termine im neuen Google-Kalender fehlten, wertete der Sync sie als „in Google gelöscht“ und löschte die iCloud-Partner.
+
+**Schutzmaßnahmen:**
+1. **Eine Zuordnungs-DB pro Eintrag**, gebunden an das Kalenderpaar. Ändert sich das Paar, werden die Zuordnungen verworfen statt als Löschungen gewertet. Die alte gemeinsame DB wird beim Update entfernt.
+2. **Leerer Kalender = Abbruch:** Liefert eine Seite 0 Termine, obwohl mindestens 3 zugeordnet sind, bricht der Lauf ohne Änderung ab.
+3. **Löschbremse:** Mehr als 5 Löschungen pro Lauf (einstellbar) oder mehr als 20 % der Zuordnungen werden nicht ausgeführt. Unter *Einstellungen → Reparaturen* erscheint ein Hinweis mit der Liste; dort „Löschen freigeben“ oder „Wiederherstellen“.
+4. **Erster Lauf löscht nie** (neuer Eintrag oder neues Kalenderpaar).
+5. **Warnung beim Einrichten**, wenn ein Kalender schon von einem anderen Eintrag genutzt wird; Fortfahren nur mit Bestätigung.
+
 ## 1.0.0 – Go-Live 🚀
 
 Erste öffentlich stabile Version. Alle bisherigen Fixes und Features sind drin, am Produktivkalender erprobt, die Dokumentation ist auf Deutsch und Englisch komplett.

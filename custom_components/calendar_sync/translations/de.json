@@ -7,7 +7,7 @@
       },
       "icloud": {
         "title": "iCloud anmelden",
-        "description": "App-spezifisches Passwort erzeugen auf appleid.apple.com → Sign-In and Security → App-Specific Passwords.",
+        "description": "App-spezifisches Passwort erzeugen auf account.apple.com → Anmeldung und Sicherheit → App-spezifische Passwörter.",
         "data": {
           "icloud_username": "Apple-ID (E-Mail)",
           "icloud_password": "App-spezifisches Passwort"
@@ -20,13 +20,15 @@
           "icloud_calendar": "iCloud-Kalender",
           "google_calendar_id": "Google-Kalender",
           "scan_interval": "Sync-Intervall in Sekunden",
-          "sync_enabled": "Synchronisation aktivieren (zunächst AUS lassen zum Testen)"
+          "sync_enabled": "Synchronisation aktivieren (zunächst AUS lassen zum Testen)",
+          "confirm_shared": "Ich verstehe das Risiko und möchte trotzdem fortfahren"
         }
       }
     },
     "error": {
       "icloud_auth": "iCloud-Login fehlgeschlagen – Zugangsdaten prüfen",
-      "no_calendars": "Keine Kalender gefunden"
+      "no_calendars": "Keine Kalender gefunden",
+      "calendar_in_use": "Einer dieser Kalender wird schon vom Eintrag „{conflict}“ synchronisiert. Zwei Einträge auf demselben Kalender können sich gegenseitig Termine anlegen oder löschen. Empfehlung: den anderen Eintrag erst entfernen. Zum Fortfahren unten bestätigen."
     },
     "abort": {
       "already_configured": "Diese Kalender-Kombination ist bereits eingerichtet",
@@ -49,20 +51,57 @@
         "data": {
           "sync_enabled": "Synchronisation aktiv",
           "scan_interval": "Sync-Intervall in Sekunden",
-          "change_calendars": "Kalender wechseln (nächster Schritt – setzt Mapping zurück)"
+          "delete_threshold": "Löschbremse: ab mehr als so vielen Löschungen pro Lauf um Freigabe bitten",
+          "change_calendars": "Kalender wechseln (nächster Schritt – setzt Zuordnungen zurück)"
         }
       },
       "pick_calendars": {
         "title": "Kalender wechseln",
-        "description": "Achtung: Beim Wechsel wird die Mapping-Datenbank gelöscht.",
+        "description": "Die Zuordnungen werden zurückgesetzt. Der nächste Lauf verknüpft gleiche Termine neu und löscht nichts.",
         "data": {
           "icloud_calendar": "iCloud-Kalender",
-          "google_calendar_id": "Google-Kalender"
+          "google_calendar_id": "Google-Kalender",
+          "confirm_shared": "Ich verstehe das Risiko und möchte trotzdem fortfahren"
         }
       }
     },
+    "error": {
+      "calendar_in_use": "Einer dieser Kalender wird schon vom Eintrag „{conflict}“ synchronisiert. Zwei Einträge auf demselben Kalender können sich gegenseitig Termine anlegen oder löschen. Empfehlung: den anderen Eintrag erst entfernen. Zum Fortfahren unten bestätigen."
+    },
     "abort": {
       "refetch_failed": "Kalender konnten nicht neu geladen werden"
+    }
+  },
+  "issues": {
+    "pending_deletions": {
+      "title": "Calendar Sync: {count} Löschungen warten auf Freigabe ({title})",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "{count} Termine sollen gelöscht werden",
+            "description": "Der Sync würde diese Termine löschen, weil sie auf der jeweils anderen Seite fehlen. Das ist mehr als die eingestellte Löschbremse erlaubt. Bis du entscheidest, wird nichts gelöscht.\n\n{events}\n\n**Löschen freigeben:** Die Termine werden beim nächsten Lauf gelöscht.\n**Wiederherstellen:** Die Termine werden nicht gelöscht, sondern auf der Seite, auf der sie fehlen, neu angelegt.",
+            "menu_options": {
+              "approve": "Löschen freigeben",
+              "restore": "Nicht löschen – fehlende Termine wiederherstellen"
+            }
+          }
+        },
+        "abort": {
+          "no_pending": "Es warten keine Löschungen mehr auf Freigabe."
+        }
+      }
+    }
+  },
+  "services": {
+    "remove_duplicates": {
+      "name": "Duplikate entfernen",
+      "description": "Entfernt inhaltlich identische Termine, die die Integration selbst angelegt hat. Nur für Administratoren.",
+      "fields": {
+        "dry_run": {
+          "name": "Probelauf",
+          "description": "Nur anzeigen, was gelöscht würde (Standard: an)."
+        }
+      }
     }
   },
   "application_credentials": {

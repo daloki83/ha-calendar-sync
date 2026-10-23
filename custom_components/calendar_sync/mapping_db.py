@@ -44,8 +44,29 @@ class MappingDB:
                 content_hash    TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_icloud_uid ON mapping(icloud_uid);
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
+        self._conn.commit()
+
+    def get_meta(self, key: str) -> str | None:
+        row = self._conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._conn.execute(
+            "INSERT INTO meta(key, value) VALUES(?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+        self._conn.commit()
+
+    def clear(self) -> None:
+        self._conn.execute("DELETE FROM mapping")
+        self._conn.execute("DELETE FROM meta")
         self._conn.commit()
 
     def upsert(self, m: Mapping) -> None:
