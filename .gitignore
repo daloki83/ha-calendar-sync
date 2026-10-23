@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.vscode/
+.idea/
+*.db
+*.sqlite
+calendar_sync_google_token.json
+.DS_Store

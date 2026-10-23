@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Calendar Sync einrichten",
+        "description": "Verbinde deinen iCloud-Familienkalender. Google wird in einem späteren Schritt verbunden.",
+        "data": {
+          "icloud_username": "Apple-ID (E-Mail)",
+          "icloud_password": "App-spezifisches Passwort",
+          "icloud_calendar": "Name des iCloud-Kalenders",
+          "google_calendar_id": "Google-Kalender-ID (später nutzbar; 'primary' = Hauptkalender)",
+          "scan_interval": "Sync-Intervall in Sekunden"
+        }
+      }
+    },
+    "error": {
+      "icloud_auth": "iCloud-Login fehlgeschlagen oder Kalender nicht gefunden"
+    },
+    "abort": {
+      "already_configured": "Dieser Kalender ist bereits eingerichtet"
+    }
+  }
+}
