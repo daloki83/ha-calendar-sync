@@ -47,13 +47,21 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         self._icloud = ICloudClient(
             username=entry.data[CONF_ICLOUD_USERNAME],
             password=entry.data[CONF_ICLOUD_PASSWORD],
-            calendar_name=entry.data[CONF_ICLOUD_CALENDAR],
+            calendar_name=entry.options.get(
+                CONF_ICLOUD_CALENDAR, entry.data[CONF_ICLOUD_CALENDAR]
+            ),
         )
-        self._calendar_id = entry.data.get(CONF_GOOGLE_CALENDAR_ID, "primary")
+        self._calendar_id = entry.options.get(
+            CONF_GOOGLE_CALENDAR_ID,
+            entry.data.get(CONF_GOOGLE_CALENDAR_ID, "primary"),
+        )
         self._db: MappingDB | None = None
 
     async def _async_update_data(self) -> dict:
-        if not self._entry.data.get(CONF_SYNC_ENABLED, False):
+        sync_on = self._entry.options.get(
+            CONF_SYNC_ENABLED, self._entry.data.get(CONF_SYNC_ENABLED, False)
+        )
+        if not sync_on:
             _LOGGER.debug("Sync ist deaktiviert – überspringe Lauf")
             return {"paused": True}
         try:
