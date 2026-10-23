@@ -259,7 +259,13 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                 continue
             ours = [e for e in events if e.extra.get("ours") or e.google_id in google_copies]
             originals = [e for e in events if e not in ours]
-            doomed = ours if originals else ours[1:]
+            if ours and originals:
+                doomed = ours
+            elif ours:
+                doomed = ours[1:]
+            else:
+                # Inhaltlich identisch, Herkunft unbekannt: genau einen behalten
+                doomed = events[1:]
             for e in doomed:
                 result["google"].append(f"{e.summary} @ {e.start.isoformat()}")
                 if not dry_run:
