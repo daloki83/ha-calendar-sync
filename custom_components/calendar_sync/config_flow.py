@@ -9,14 +9,18 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsF
 from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow, selector
 
+from homeassistant.core import HomeAssistant
+
 from .const import (
+    CONF_CONFIRM_SHARED,
+    CONF_DELETE_THRESHOLD,
     CONF_GOOGLE_CALENDAR_ID,
     CONF_ICLOUD_CALENDAR,
     CONF_ICLOUD_PASSWORD,
     CONF_ICLOUD_USERNAME,
     CONF_SCAN_INTERVAL,
     CONF_SYNC_ENABLED,
-    CONF_TOKEN,
+    DEFAULT_DELETE_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     OAUTH_SCOPES,
@@ -114,7 +118,19 @@ class CalendarSyncOAuth2FlowHandler(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         assert self._token_data and self._icloud_user and self._icloud_pw
+        errors: dict[str, str] = {}
+        conflict = ""
         if user_input is not None:
+            conflict = _calendar_in_use(
+                self.hass,
+                self._icloud_user,
+                user_input[CONF_ICLOUD_CALENDAR],
+                user_input[CONF_GOOGLE_CALENDAR_ID],
+                exclude_entry_id=None,
+            )
+            if conflict and not user_input.get(CONF_CONFIRM_SHARED):
+                errors["base"] = "calendar_in_use"
+        if user_input is not None and not errors:
             google_label = _google_label(
                 self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID]
             )
@@ -142,27 +158,38 @@ class CalendarSyncOAuth2FlowHandler(
             selector.SelectOptionDict(value=c["id"], label=c["label"])
             for c in self._google_calendars
         ]
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_ICLOUD_CALENDAR): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=self._icloud_calendars,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Required(CONF_GOOGLE_CALENDAR_ID): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=google_options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Optional(
-                    CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                ): int,
-                vol.Optional(CONF_SYNC_ENABLED, default=False): bool,
-            }
+        prev = user_input or {}
+        fields: dict = {
+            vol.Required(
+                CONF_ICLOUD_CALENDAR, default=prev.get(CONF_ICLOUD_CALENDAR, vol.UNDEFINED)
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=self._icloud_calendars,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                CONF_GOOGLE_CALENDAR_ID,
+                default=prev.get(CONF_GOOGLE_CALENDAR_ID, vol.UNDEFINED),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=google_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional(
+                CONF_SCAN_INTERVAL, default=prev.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+            ): int,
+            vol.Optional(CONF_SYNC_ENABLED, default=False): bool,
+        }
+        if conflict:
+            fields[vol.Optional(CONF_CONFIRM_SHARED, default=False)] = bool
+        return self.async_show_form(
+            step_id="pick",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"conflict": conflict},
         )
-        return self.async_show_form(step_id="pick", data_schema=schema)
 
 
 # ------- Executor-Helfer (blockierend) -------
@@ -191,6 +218,32 @@ def _short_google(cid: str) -> str:
     return cid
 
 
+def _calendar_in_use(
+    hass: HomeAssistant,
+    icloud_user: str,
+    icloud_calendar: str,
+    google_calendar_id: str,
+    exclude_entry_id: str | None,
+) -> str:
+    """Titel eines anderen Eintrags, der einen der beiden Kalender schon nutzt."""
+    for other in hass.config_entries.async_entries(DOMAIN):
+        # Auch deaktivierte Einträge zählen: sie können wieder eingeschaltet werden
+        if other.entry_id == exclude_entry_id:
+            continue
+
+        def opt(key: str, default=None, _o=other):
+            return _o.options.get(key, _o.data.get(key, default))
+
+        same_icloud = (
+            other.data.get(CONF_ICLOUD_USERNAME) == icloud_user
+            and opt(CONF_ICLOUD_CALENDAR) == icloud_calendar
+        )
+        same_google = opt(CONF_GOOGLE_CALENDAR_ID) == google_calendar_id
+        if same_icloud or same_google:
+            return other.title
+    return ""
+
+
 class CalendarSyncOptionsFlow(OptionsFlow):
     """Menü zum Pausieren, Intervall-Ändern, Kalender-Wechseln."""
 
@@ -216,8 +269,10 @@ class CalendarSyncOptionsFlow(OptionsFlow):
                 data={
                     CONF_SYNC_ENABLED: user_input[CONF_SYNC_ENABLED],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    CONF_DELETE_THRESHOLD: user_input[CONF_DELETE_THRESHOLD],
                     CONF_ICLOUD_CALENDAR: self._opt(CONF_ICLOUD_CALENDAR, ""),
                     CONF_GOOGLE_CALENDAR_ID: self._opt(CONF_GOOGLE_CALENDAR_ID, "primary"),
+                    "google_calendar_label": self._opt("google_calendar_label", ""),
                 },
             )
 
@@ -231,6 +286,10 @@ class CalendarSyncOptionsFlow(OptionsFlow):
                     CONF_SCAN_INTERVAL,
                     default=self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): int,
+                vol.Required(
+                    CONF_DELETE_THRESHOLD,
+                    default=self._opt(CONF_DELETE_THRESHOLD, DEFAULT_DELETE_THRESHOLD),
+                ): vol.All(int, vol.Range(min=0, max=1000)),
                 vol.Optional("change_calendars", default=False): bool,
             }
         )
@@ -268,7 +327,19 @@ class CalendarSyncOptionsFlow(OptionsFlow):
             except Exception:  # noqa: BLE001
                 return self.async_abort(reason="refetch_failed")
 
+        conflict = ""
         if user_input is not None:
+            conflict = _calendar_in_use(
+                self.hass,
+                self._entry.data[CONF_ICLOUD_USERNAME],
+                user_input[CONF_ICLOUD_CALENDAR],
+                user_input[CONF_GOOGLE_CALENDAR_ID],
+                exclude_entry_id=self._entry.entry_id,
+            )
+            if conflict and not user_input.get(CONF_CONFIRM_SHARED):
+                errors["base"] = "calendar_in_use"
+
+        if user_input is not None and not errors:
             google_label = _google_label(
                 self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID]
             )
@@ -280,6 +351,9 @@ class CalendarSyncOptionsFlow(OptionsFlow):
                 data={
                     CONF_SYNC_ENABLED: self._opt(CONF_SYNC_ENABLED, False),
                     CONF_SCAN_INTERVAL: self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                    CONF_DELETE_THRESHOLD: self._opt(
+                        CONF_DELETE_THRESHOLD, DEFAULT_DELETE_THRESHOLD
+                    ),
                     CONF_ICLOUD_CALENDAR: icloud_name,
                     CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
                     "google_calendar_label": google_label,
@@ -291,28 +365,34 @@ class CalendarSyncOptionsFlow(OptionsFlow):
             selector.SelectOptionDict(value=c["id"], label=c["label"])
             for c in self._google_calendars
         ]
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_ICLOUD_CALENDAR,
-                    default=self._opt(CONF_ICLOUD_CALENDAR, ""),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=self._icloud_calendars,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
+        prev = user_input or {}
+        fields: dict = {
+            vol.Required(
+                CONF_ICLOUD_CALENDAR,
+                default=prev.get(CONF_ICLOUD_CALENDAR, self._opt(CONF_ICLOUD_CALENDAR, "")),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=self._icloud_calendars,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                CONF_GOOGLE_CALENDAR_ID,
+                default=prev.get(
+                    CONF_GOOGLE_CALENDAR_ID, self._opt(CONF_GOOGLE_CALENDAR_ID, "primary")
                 ),
-                vol.Required(
-                    CONF_GOOGLE_CALENDAR_ID,
-                    default=self._opt(CONF_GOOGLE_CALENDAR_ID, "primary"),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=google_options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-            }
-        )
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=google_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+        if conflict:
+            fields[vol.Optional(CONF_CONFIRM_SHARED, default=False)] = bool
         return self.async_show_form(
-            step_id="pick_calendars", data_schema=schema, errors=errors
+            step_id="pick_calendars",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"conflict": conflict},
         )

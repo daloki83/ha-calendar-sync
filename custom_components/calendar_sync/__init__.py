@@ -10,25 +10,37 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import Unauthorized
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 
 from pathlib import Path
 
-from .const import CONF_SCAN_INTERVAL, DB_FILENAME, DEFAULT_SCAN_INTERVAL, DOMAIN
-from .coordinator import CalendarSyncCoordinator
+from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, LEGACY_DB_FILENAME
+from .coordinator import CalendarSyncCoordinator, db_path_for, issue_id_for
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def _unlink(path: Path, reason: str) -> None:
+    if path.exists():
+        try:
+            path.unlink()
+            _LOGGER.info("Zuordnungs-DB entfernt (%s): %s", reason, path.name)
+        except OSError as err:
+            _LOGGER.warning("Zuordnungs-DB nicht gelöscht: %s", err)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    # Falls Kalender gewechselt wurde: Mapping-DB vorher wegräumen
+    # Bis v1.0.x teilten sich alle Einträge eine DB – die ist unsicher und wird
+    # verworfen. Der erste Lauf verknüpft vorhandene Termine neu und löscht nichts.
+    await hass.async_add_executor_job(
+        _unlink, Path(hass.config.path(DOMAIN)) / LEGACY_DB_FILENAME, "Migration"
+    )
+
+    # Kalender gewechselt: eigene DB zurücksetzen
     if entry.options.get("reset_mapping"):
-        db_path = Path(hass.config.path(DOMAIN)) / DB_FILENAME
-        if db_path.exists():
-            try:
-                db_path.unlink()
-                _LOGGER.info("Mapping-DB zurückgesetzt wegen Kalenderwechsel")
-            except OSError as err:
-                _LOGGER.warning("Mapping-DB nicht gelöscht: %s", err)
+        await hass.async_add_executor_job(
+            _unlink, db_path_for(hass, entry.entry_id), "Kalenderwechsel"
+        )
         new_opts = {k: v for k, v in entry.options.items() if k != "reset_mapping"}
         hass.config_entries.async_update_entry(entry, options=new_opts)
 
@@ -87,17 +99,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if coordinator is not None:
         await coordinator.async_shutdown()
+    ir.async_delete_issue(hass, DOMAIN, issue_id_for(entry.entry_id))
     return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Beim endgültigen Entfernen die Mapping-DB mit löschen."""
-    from pathlib import Path
-    from .const import DB_FILENAME
-    db_path = Path(hass.config.path(DOMAIN)) / DB_FILENAME
-    if db_path.exists():
-        try:
-            db_path.unlink()
-            _LOGGER.info("Mapping-DB entfernt: %s", db_path)
-        except OSError as err:
-            _LOGGER.warning("Konnte Mapping-DB nicht löschen: %s", err)
+    """Beim endgültigen Entfernen die eigene Zuordnungs-DB mit löschen."""
+    await hass.async_add_executor_job(
+        _unlink, db_path_for(hass, entry.entry_id), "Eintrag entfernt"
+    )
