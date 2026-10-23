@@ -1,7 +1,11 @@
 {
   "config": {
     "step": {
-      "user": {
+      "pick_implementation": {
+        "title": "Google verbinden",
+        "description": "Wähle die Google-OAuth-Credentials, die zuvor unter 'Anwendungs-Zugangsdaten' hinterlegt wurden."
+      },
+      "icloud": {
         "title": "iCloud anmelden",
         "description": "App-spezifisches Passwort erzeugen auf appleid.apple.com → Sign-In and Security → App-Specific Passwords.",
         "data": {
@@ -11,10 +15,10 @@
       },
       "pick": {
         "title": "Kalender wählen",
-        "description": "Wähle den iCloud-Kalender, der synchronisiert werden soll.",
+        "description": "Welcher iCloud-Kalender wird mit welchem Google-Kalender synchronisiert?",
         "data": {
           "icloud_calendar": "iCloud-Kalender",
-          "google_calendar_id": "Google-Kalender-ID (später nutzbar; 'primary' = Hauptkalender)",
+          "google_calendar_id": "Google-Kalender",
           "scan_interval": "Sync-Intervall in Sekunden"
         }
       }
@@ -24,7 +28,19 @@
       "no_calendars": "Keine Kalender gefunden"
     },
     "abort": {
-      "already_configured": "Dieser Kalender ist bereits eingerichtet"
+      "already_configured": "Diese Kalender-Kombination ist bereits eingerichtet",
+      "google_fetch_failed": "Google-Kalender konnten nicht abgerufen werden",
+      "missing_configuration": "Google-OAuth-Credentials fehlen – siehe README",
+      "oauth_error": "Fehler beim Google-OAuth",
+      "oauth_timeout": "Google-OAuth-Timeout",
+      "oauth_unauthorized": "Google verweigerte die Autorisierung",
+      "oauth_failed": "Google-OAuth fehlgeschlagen"
+    },
+    "create_entry": {
+      "default": "Google erfolgreich verbunden."
     }
+  },
+  "application_credentials": {
+    "description": "Lege in deinem [Google Cloud Projekt]({console_url}) eine OAuth-Client-ID (Typ 'Webanwendung') an. Als autorisierten Redirect-URI eintragen: `{redirect_url}`."
   }
 }

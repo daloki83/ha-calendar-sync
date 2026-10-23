@@ -30,7 +30,18 @@ Google-/CalDAV-Integrationen – bringt eigene Clients mit.
 
 ## Google einrichten
 
-*(folgt in v0.2)* – OAuth-Flow in Vorbereitung.
+1. [Google Cloud Console](https://console.cloud.google.com/) → neues Projekt oder bestehendes nutzen
+2. *APIs & Services → Library* → **Google Calendar API** aktivieren
+3. *APIs & Services → OAuth consent screen* → **External**, deine Mail als Testnutzer eintragen
+4. *APIs & Services → Credentials → + Create credentials → OAuth client ID*
+   - Application type: **Web application**
+   - Authorized redirect URI: `https://my.home-assistant.io/redirect/oauth`
+5. Client-ID + Client-Secret kopieren
+6. In Home Assistant: *Einstellungen → Geräte & Dienste → ⋮ → Application Credentials → Add Application Credential*
+   - Integration: Calendar Sync (Google ↔ iCloud)
+   - Name: beliebig
+   - Client ID + Secret einfügen
+7. Danach *Integration hinzufügen → Calendar Sync* starten – OAuth-Dialog öffnet sich automatisch.
 
 ## Entwicklung
 

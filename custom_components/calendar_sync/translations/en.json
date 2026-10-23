@@ -1,7 +1,11 @@
 {
   "config": {
     "step": {
-      "user": {
+      "pick_implementation": {
+        "title": "Connect Google",
+        "description": "Select the Google OAuth credentials you set up under 'Application Credentials'."
+      },
+      "icloud": {
         "title": "Sign in to iCloud",
         "description": "Create an app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords.",
         "data": {
@@ -10,11 +14,11 @@
         }
       },
       "pick": {
-        "title": "Pick calendar",
-        "description": "Choose which iCloud calendar to sync.",
+        "title": "Pick calendars",
+        "description": "Which iCloud calendar syncs with which Google calendar?",
         "data": {
           "icloud_calendar": "iCloud calendar",
-          "google_calendar_id": "Google calendar ID (used later; 'primary' = main calendar)",
+          "google_calendar_id": "Google calendar",
           "scan_interval": "Sync interval in seconds"
         }
       }
@@ -24,7 +28,19 @@
       "no_calendars": "No calendars found"
     },
     "abort": {
-      "already_configured": "This calendar is already configured"
+      "already_configured": "This calendar combination is already configured",
+      "google_fetch_failed": "Could not fetch Google calendars",
+      "missing_configuration": "Google OAuth credentials missing – see README",
+      "oauth_error": "Google OAuth error",
+      "oauth_timeout": "Google OAuth timed out",
+      "oauth_unauthorized": "Google denied authorization",
+      "oauth_failed": "Google OAuth failed"
+    },
+    "create_entry": {
+      "default": "Successfully connected to Google."
     }
+  },
+  "application_credentials": {
+    "description": "In your [Google Cloud project]({console_url}), create an OAuth Client ID of type 'Web application'. Add this authorized redirect URI: `{redirect_url}`."
   }
 }

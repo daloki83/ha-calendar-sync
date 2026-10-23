@@ -1,12 +1,12 @@
-"""Config-Flow – zweistufig: zuerst iCloud-Login, dann Kalenderauswahl."""
+"""Config-Flow – Google OAuth → iCloud-Login → Kalender wählen."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers import config_entry_oauth2_flow, selector
 
 from .const import (
     CONF_GOOGLE_CALENDAR_ID,
@@ -14,29 +14,67 @@ from .const import (
     CONF_ICLOUD_PASSWORD,
     CONF_ICLOUD_USERNAME,
     CONF_SCAN_INTERVAL,
+    CONF_TOKEN,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    OAUTH_SCOPES,
 )
+from .google_client import GoogleClient, build_credentials
 from .icloud_client import ICloudClient
 
+_LOGGER = logging.getLogger(__name__)
 
-class CalendarSyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+
+class CalendarSyncOAuth2FlowHandler(
+    config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMAIN
+):
+    """Startet mit Google-OAuth, geht dann weiter zu iCloud und Auswahl."""
+
+    DOMAIN = DOMAIN
     VERSION = 1
 
     def __init__(self) -> None:
-        self._username: str | None = None
-        self._password: str | None = None
-        self._calendars: list[str] = []
+        super().__init__()
+        self._token_data: dict[str, Any] | None = None
+        self._google_calendars: list[dict[str, str]] = []
+        self._icloud_user: str | None = None
+        self._icloud_pw: str | None = None
+        self._icloud_calendars: list[str] = []
 
-    async def async_step_user(
+    @property
+    def logger(self) -> logging.Logger:
+        return _LOGGER
+
+    @property
+    def extra_authorize_data(self) -> dict[str, Any]:
+        return {
+            "scope": " ".join(OAUTH_SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+        }
+
+    async def async_oauth_create_entry(
+        self, data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Google-Token ist da – weiter zu iCloud."""
+        self._token_data = data
+        try:
+            self._google_calendars = await self.hass.async_add_executor_job(
+                _list_google_calendars, data
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.exception("Google-Kalender konnten nicht gelesen werden: %s", err)
+            return self.async_abort(reason="google_fetch_failed")
+        return await self.async_step_icloud()
+
+    async def async_step_icloud(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Schritt 1: Zugangsdaten erfassen und Kalender holen."""
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 calendars = await self.hass.async_add_executor_job(
-                    _list_calendars,
+                    _list_icloud_calendars,
                     user_input[CONF_ICLOUD_USERNAME],
                     user_input[CONF_ICLOUD_PASSWORD],
                 )
@@ -46,9 +84,9 @@ class CalendarSyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if not calendars:
                     errors["base"] = "no_calendars"
                 else:
-                    self._username = user_input[CONF_ICLOUD_USERNAME]
-                    self._password = user_input[CONF_ICLOUD_PASSWORD]
-                    self._calendars = calendars
+                    self._icloud_user = user_input[CONF_ICLOUD_USERNAME]
+                    self._icloud_pw = user_input[CONF_ICLOUD_PASSWORD]
+                    self._icloud_calendars = calendars
                     return await self.async_step_pick()
 
         schema = vol.Schema(
@@ -58,37 +96,52 @@ class CalendarSyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
+            step_id="icloud", data_schema=schema, errors=errors
         )
 
     async def async_step_pick(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Schritt 2: Kalender aus Dropdown wählen + Optionen."""
-        assert self._username and self._password
+    ) -> ConfigFlowResult:
+        assert self._token_data and self._icloud_user and self._icloud_pw
         if user_input is not None:
             await self.async_set_unique_id(
-                f"{self._username}::{user_input[CONF_ICLOUD_CALENDAR]}"
+                f"{self._icloud_user}::{user_input[CONF_ICLOUD_CALENDAR]}"
+                f"::{user_input[CONF_GOOGLE_CALENDAR_ID]}"
             )
             self._abort_if_unique_id_configured()
             return self.async_create_entry(
-                title=f"iCloud: {user_input[CONF_ICLOUD_CALENDAR]}",
+                title=(
+                    f"{user_input[CONF_ICLOUD_CALENDAR]} ↔ "
+                    f"{_google_label(self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID])}"
+                ),
                 data={
-                    CONF_ICLOUD_USERNAME: self._username,
-                    CONF_ICLOUD_PASSWORD: self._password,
-                    **user_input,
+                    CONF_TOKEN: self._token_data,
+                    CONF_ICLOUD_USERNAME: self._icloud_user,
+                    CONF_ICLOUD_PASSWORD: self._icloud_pw,
+                    CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
+                    CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
+                    CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
 
+        google_options = [
+            selector.SelectOptionDict(value=c["id"], label=c["label"])
+            for c in self._google_calendars
+        ]
         schema = vol.Schema(
             {
                 vol.Required(CONF_ICLOUD_CALENDAR): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=self._calendars,
+                        options=self._icloud_calendars,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Optional(CONF_GOOGLE_CALENDAR_ID, default="primary"): str,
+                vol.Required(CONF_GOOGLE_CALENDAR_ID): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=google_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                 ): int,
@@ -97,6 +150,20 @@ class CalendarSyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="pick", data_schema=schema)
 
 
-def _list_calendars(user: str, pw: str) -> list[str]:
-    client = ICloudClient(user, pw, "")
-    return client.list_calendars()
+# ------- Executor-Helfer (blockierend) -------
+
+def _list_icloud_calendars(user: str, pw: str) -> list[str]:
+    return ICloudClient(user, pw, "").list_calendars()
+
+
+def _list_google_calendars(token_data: dict[str, Any]) -> list[dict[str, str]]:
+    creds = build_credentials(token_data)
+    gc = GoogleClient.from_credentials(creds, calendar_id="primary")
+    return gc.list_calendars()
+
+
+def _google_label(calendars: list[dict[str, str]], cid: str) -> str:
+    for c in calendars:
+        if c["id"] == cid:
+            return c["label"]
+    return cid

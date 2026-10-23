@@ -14,4 +14,10 @@ DEFAULT_SCAN_INTERVAL = 300  # 5 Minuten
 ICLOUD_CALDAV_URL = "https://caldav.icloud.com"
 
 DB_FILENAME = "calendar_sync_mapping.db"
-TOKEN_FILENAME = "calendar_sync_google_token.json"
+
+OAUTH_SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/calendar.events",
+]
+
+CONF_TOKEN = "token"
