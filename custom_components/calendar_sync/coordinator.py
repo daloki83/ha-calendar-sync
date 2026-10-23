@@ -62,7 +62,10 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             stats = await self.hass.async_add_executor_job(
                 self._sync_once, token_data
             )
-            _LOGGER.info("Sync-Lauf fertig: %s", stats)
+            if any(v for k, v in stats.items() if k != "paused"):
+                _LOGGER.info("Sync-Lauf: %s", stats)
+            else:
+                _LOGGER.debug("Sync-Lauf (idle): %s", stats)
             return stats
         except Exception as err:
             raise UpdateFailed(f"Sync fehlgeschlagen: {err}") from err
@@ -85,14 +88,10 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
 
         icloud_events = {e.icloud_uid: e for e in self._icloud.fetch_events()}
         google_events = {e.google_id: e for e in google.fetch_events()}
-        _LOGGER.info(
+        _LOGGER.debug(
             "Fetched: %d Google / %d iCloud events",
             len(google_events), len(icloud_events),
         )
-        for e in google_events.values():
-            _LOGGER.info("  G: '%s' hash=%s", e.summary, e.content_hash()[:8])
-        for e in icloud_events.values():
-            _LOGGER.info("  I: '%s' hash=%s", e.summary, e.content_hash()[:8])
 
         stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0}
 
@@ -155,18 +154,16 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             return
         g_time = gev.updated or datetime.now(timezone.utc)
         i_time = iev.updated or datetime.now(timezone.utc)
-        _LOGGER.info(
+        _LOGGER.debug(
             "Reconcile %s: g_hash=%s i_hash=%s stored=%s g_time=%s i_time=%s",
             gev.summary or iev.summary,
             g_hash[:8], i_hash[:8], mapping.content_hash[:8],
             g_time, i_time,
         )
         if g_time >= i_time:
-            _LOGGER.info("→ Google gewinnt, update iCloud")
             self._icloud.update_event(mapping.icloud_href, gev, mapping.icloud_uid)
             new_hash = g_hash
         else:
-            _LOGGER.info("→ iCloud gewinnt, update Google")
             google.update_event(mapping.google_id, iev)
             new_hash = i_hash
         self._db.upsert(Mapping(
