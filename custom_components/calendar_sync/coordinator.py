@@ -88,10 +88,20 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
 
         icloud_events = {e.icloud_uid: e for e in self._icloud.fetch_events()}
         google_events = {e.google_id: e for e in google.fetch_events()}
-        _LOGGER.debug(
+        _LOGGER.info(
             "Fetched: %d Google / %d iCloud events",
             len(google_events), len(icloud_events),
         )
+        for e in google_events.values():
+            _LOGGER.info(
+                "  G[%s] '%s' hash=%s rec=%s",
+                e.google_id[:8], e.summary, e.content_hash()[:8], e.recurrence,
+            )
+        for e in icloud_events.values():
+            _LOGGER.info(
+                "  I[%s] '%s' hash=%s rec=%s",
+                (e.icloud_uid or "")[:8], e.summary, e.content_hash()[:8], e.recurrence,
+            )
 
         stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0}
 
@@ -154,8 +164,8 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             return
         g_time = gev.updated or datetime.now(timezone.utc)
         i_time = iev.updated or datetime.now(timezone.utc)
-        _LOGGER.debug(
-            "Reconcile %s: g_hash=%s i_hash=%s stored=%s g_time=%s i_time=%s",
+        _LOGGER.info(
+            "Reconcile '%s': g_hash=%s i_hash=%s stored=%s g_time=%s i_time=%s",
             gev.summary or iev.summary,
             g_hash[:8], i_hash[:8], mapping.content_hash[:8],
             g_time, i_time,
