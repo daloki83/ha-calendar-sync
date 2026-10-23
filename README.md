@@ -4,15 +4,22 @@ Bidirektionale Synchronisation zwischen einem privaten **Google-Kalender** und
 einem **iCloud-Familienkalender**. Unabhängig von Home Assistants eingebauten
 Google-/CalDAV-Integrationen – bringt eigene Clients mit.
 
-**Status: v0.1 (Grundgerüst, iCloud fertig, Google-OAuth folgt).**
+**Status: v0.4 (stabil).**
 
-## Features (Ziel)
+## Features
 
 - Bidirektionaler Sync: Titel, Zeit, Ort, Beschreibung, Ganztagsflag
+- **Serien-Events** (RRULE, RDATE, EXDATE) inkl. DST-sicherer Zeitzonen
 - Konfliktregel: **Last-Write-Wins** per Timestamp
 - Löschungen auf einer Seite werden auf der anderen nachgezogen
-- Mapping-DB (SQLite) in `config/calendar_sync/`
+- Mapping-DB (SQLite) in `config/calendar_sync/` — wird beim Entfernen des Eintrags mit gelöscht
 - Pollt alle 5 Minuten (einstellbar)
+- „Sync aktivieren"-Schalter zum sicheren Testen
+
+## Noch nicht abgedeckt
+
+- Einzelne Ausnahmen in Serien („Montag ausfallen lassen" als separates Exception-Event)
+- Teilnehmer, Erinnerungen, Anhänge, Farben
 
 ## Installation via HACS
 
