@@ -1,19 +1,19 @@
 {
   "domain": "calendar_sync",
   "name": "Calendar 2-way Sync - Google ↔ iCloud",
-  "version": "1.0.0",
-  "documentation": "https://github.com/daloki83/ha-calendar-sync",
-  "issue_tracker": "https://github.com/daloki83/ha-calendar-sync/issues",
   "codeowners": ["@daloki83"],
   "config_flow": true,
-  "iot_class": "cloud_polling",
-  "integration_type": "service",
   "dependencies": ["application_credentials"],
+  "documentation": "https://github.com/daloki83/ha-calendar-sync",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/daloki83/ha-calendar-sync/issues",
   "requirements": [
-    "caldav>=1.5.0,<2",
-    "icalendar>=5.0.11,<7",
-    "google-api-python-client>=2.149.0,<3",
-    "google-auth>=2.35.0,<3",
-    "google-auth-oauthlib>=1.2.1,<2"
-  ]
+    "caldav>=1.5.0",
+    "icalendar>=5.0.11",
+    "google-api-python-client>=2.70.0",
+    "google-auth>=2.35.0",
+    "google-auth-oauthlib>=1.2.1"
+  ],
+  "version": "1.0.1"
 }
