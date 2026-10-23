@@ -115,16 +115,16 @@ class CalendarSyncOAuth2FlowHandler(
     ) -> ConfigFlowResult:
         assert self._token_data and self._icloud_user and self._icloud_pw
         if user_input is not None:
+            google_label = _google_label(
+                self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID]
+            )
             await self.async_set_unique_id(
                 f"{self._icloud_user}::{user_input[CONF_ICLOUD_CALENDAR]}"
                 f"::{user_input[CONF_GOOGLE_CALENDAR_ID]}"
             )
             self._abort_if_unique_id_configured()
             return self.async_create_entry(
-                title=(
-                    f"{user_input[CONF_ICLOUD_CALENDAR]} ↔ "
-                    f"{_google_label(self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID])}"
-                ),
+                title=f"{user_input[CONF_ICLOUD_CALENDAR]} ↔ {google_label}",
                 data={
                     # auth_implementation + token aus dem OAuth-Flow übernehmen
                     **self._token_data,
@@ -132,6 +132,7 @@ class CalendarSyncOAuth2FlowHandler(
                     CONF_ICLOUD_PASSWORD: self._icloud_pw,
                     CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
                     CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
+                    "google_calendar_label": google_label,
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                     CONF_SYNC_ENABLED: user_input[CONF_SYNC_ENABLED],
                 },
@@ -180,6 +181,13 @@ def _google_label(calendars: list[dict[str, str]], cid: str) -> str:
     for c in calendars:
         if c["id"] == cid:
             return c["label"]
+    return _short_google(cid)
+
+
+def _short_google(cid: str) -> str:
+    """Kürze eine lange Google-Kalender-ID."""
+    if "@" in cid:
+        return cid.split("@", 1)[0][:8] + "…"
     return cid
 
 
@@ -226,12 +234,15 @@ class CalendarSyncOptionsFlow(OptionsFlow):
                 vol.Optional("change_calendars", default=False): bool,
             }
         )
+        google_label = self._opt("google_calendar_label", "") or _short_google(
+            self._opt(CONF_GOOGLE_CALENDAR_ID, "?")
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=schema,
             description_placeholders={
                 "icloud_calendar": self._opt(CONF_ICLOUD_CALENDAR, "?"),
-                "google_calendar_id": self._opt(CONF_GOOGLE_CALENDAR_ID, "?"),
+                "google_calendar_id": google_label,
             },
         )
 
@@ -258,13 +269,20 @@ class CalendarSyncOptionsFlow(OptionsFlow):
                 return self.async_abort(reason="refetch_failed")
 
         if user_input is not None:
+            google_label = _google_label(
+                self._google_calendars, user_input[CONF_GOOGLE_CALENDAR_ID]
+            )
+            icloud_name = user_input[CONF_ICLOUD_CALENDAR]
+            new_title = f"{icloud_name} ↔ {google_label}"
+            self.hass.config_entries.async_update_entry(self._entry, title=new_title)
             return self.async_create_entry(
                 title="",
                 data={
                     CONF_SYNC_ENABLED: self._opt(CONF_SYNC_ENABLED, False),
                     CONF_SCAN_INTERVAL: self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                    CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
+                    CONF_ICLOUD_CALENDAR: icloud_name,
                     CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
+                    "google_calendar_label": google_label,
                     "reset_mapping": True,
                 },
             )
