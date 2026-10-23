@@ -19,6 +19,8 @@ class SyncEvent:
     # Serienregel als iCal-Zeilen (z. B. ["RRULE:FREQ=WEEKLY;BYDAY=MO"]);
     # bei Einzelterminen leer.
     recurrence: list[str] = field(default_factory=list)
+    # IANA-TZ-Name der Quelle (z. B. "Europe/Berlin"), leer für UTC/Floating.
+    timezone: str = ""
     # Zeitpunkt der letzten Änderung auf der Quellseite (UTC)
     updated: datetime | None = None
     # Herkunfts-IDs (eine davon ist gesetzt, je nach Quelle)

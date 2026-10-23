@@ -19,6 +19,15 @@ from .models import SyncEvent
 _LOGGER = logging.getLogger(__name__)
 
 
+def _zoneinfo(name: str):
+    """Lade ZoneInfo oder None (unbekannte TZ-Namen)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:
+        return None
+
+
 def _extract_recurrence(comp) -> list[str]:
     """Extrahiere RRULE/RDATE/EXDATE als iCal-Zeilen."""
     out: list[str] = []
@@ -109,6 +118,10 @@ class ICloudClient:
             last_mod = comp.get("LAST-MODIFIED") or comp.get("DTSTAMP")
             updated = last_mod.dt if last_mod else None
             recurrence = _extract_recurrence(comp)
+            tz_name = ""
+            start_prop = comp.get("DTSTART")
+            if start_prop is not None:
+                tz_name = start_prop.params.get("TZID", "") or ""
             return SyncEvent(
                 summary=str(comp.get("SUMMARY") or ""),
                 start=dtstart,
@@ -117,6 +130,7 @@ class ICloudClient:
                 location=str(comp.get("LOCATION") or ""),
                 description=str(comp.get("DESCRIPTION") or ""),
                 recurrence=recurrence,
+                timezone=tz_name,
                 updated=updated,
                 icloud_uid=str(comp.get("UID")),
                 extra={"href": _href_of(dav_event)},
@@ -198,8 +212,15 @@ class ICloudClient:
             vevent.add("dtstart", ev.start.date())
             vevent.add("dtend", ev.end.date())
         else:
-            vevent.add("dtstart", ev.start)
-            vevent.add("dtend", ev.end)
+            tz = _zoneinfo(ev.timezone) if ev.timezone else None
+            if tz is not None:
+                start = ev.start.astimezone(tz)
+                end = ev.end.astimezone(tz)
+            else:
+                start = ev.start if ev.start.tzinfo else ev.start.replace(tzinfo=timezone.utc)
+                end = ev.end if ev.end.tzinfo else ev.end.replace(tzinfo=timezone.utc)
+            vevent.add("dtstart", start)
+            vevent.add("dtend", end)
         if ev.location:
             vevent.add("location", ev.location)
         if ev.description:
