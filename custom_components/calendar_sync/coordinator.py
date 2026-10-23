@@ -68,7 +68,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
     async def async_shutdown(self) -> None:  # type: ignore[override]
         await super().async_shutdown()
         if self._db is not None:
-            self._db.close()
+            await self.hass.async_add_executor_job(self._db.close)
 
     # ------------------------------------------------------------------
     #  Blockierender Teil

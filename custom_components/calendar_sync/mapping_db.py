@@ -28,7 +28,7 @@ class Mapping:
 class MappingDB:
     def __init__(self, path: Path) -> None:
         self._path = path
-        self._conn = sqlite3.connect(path)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_schema()
 
