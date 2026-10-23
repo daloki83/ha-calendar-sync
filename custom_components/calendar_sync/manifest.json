@@ -1,7 +1,7 @@
 {
   "domain": "calendar_sync",
   "name": "Calendar Sync (Google ↔ iCloud)",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "documentation": "https://github.com/daloki83/ha-calendar-sync",
   "issue_tracker": "https://github.com/daloki83/ha-calendar-sync/issues",
   "codeowners": ["@daloki83"],
