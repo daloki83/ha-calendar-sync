@@ -227,8 +227,33 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         result: dict = {"dry_run": dry_run, "google": [], "icloud": []}
 
         g_groups: dict[str, list[SyncEvent]] = {}
+        g_loose: dict[tuple, list[SyncEvent]] = {}
         for e in google.fetch_events():
             g_groups.setdefault(e.content_hash(), []).append(e)
+            g_loose.setdefault(
+                (e.summary.strip(), e.start.astimezone(timezone.utc).isoformat()), []
+            ).append(e)
+        if dry_run:
+            result["google_similar"] = [
+                [
+                    {
+                        "summary": e.summary,
+                        "start": e.start.isoformat(),
+                        "end": e.end.isoformat(),
+                        "all_day": e.all_day,
+                        "loc": e.location,
+                        "desc_len": len(e.description or ""),
+                        "rec": e.recurrence,
+                        "tz": e.timezone,
+                        "hash": e.content_hash()[:8],
+                        "ours": bool(e.extra.get("ours")) or e.google_id in google_copies,
+                    }
+                    for e in evs
+                ]
+                for evs in g_loose.values()
+                if len(evs) > 1
+            ][:5]
+            result["google_similar_groups"] = sum(1 for v in g_loose.values() if len(v) > 1)
         for events in g_groups.values():
             if len(events) < 2:
                 continue
