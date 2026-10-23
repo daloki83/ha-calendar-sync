@@ -1,45 +1,71 @@
 """Google-Calendar-Client.
 
-OAuth-Flow wird später (sobald das Handy da ist) scharf geschaltet.
-Die Methoden hier sind so geschrieben, dass sie mit gültigen Credentials
-sofort funktionieren – nur das Beschaffen der Credentials fehlt noch.
+Credentials kommen aus HAs OAuth-Session (siehe application_credentials.py).
 """
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from typing import Any
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+from .const import OAUTH_SCOPES
 from .models import SyncEvent
 
 _LOGGER = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+def build_credentials(token_data: dict[str, Any]) -> Credentials:
+    """Rohes HA-OAuth-Token-Dict in google.oauth2.Credentials umwandeln."""
+    tok = token_data.get("token", token_data)
+    return Credentials(
+        token=tok["access_token"],
+        refresh_token=tok.get("refresh_token"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=tok.get("client_id"),
+        client_secret=tok.get("client_secret"),
+        scopes=OAUTH_SCOPES,
+    )
 
 
 class GoogleClient:
-    def __init__(self, token_path: Path, calendar_id: str) -> None:
-        self._token_path = token_path
+    def __init__(self, calendar_id: str = "primary") -> None:
         self._calendar_id = calendar_id
         self._service = None
+        self._creds: Credentials | None = None
 
-    # ---------- Connection ----------
-    def connect(self) -> None:
-        if not self._token_path.exists():
-            raise RuntimeError(
-                "Google-Token fehlt – OAuth-Flow noch nicht abgeschlossen"
-            )
-        data = json.loads(self._token_path.read_text("utf-8"))
-        creds = Credentials.from_authorized_user_info(data, SCOPES)
+    # ---------- Konstruktion ----------
+    @classmethod
+    def from_credentials(
+        cls, creds: Credentials, calendar_id: str = "primary"
+    ) -> "GoogleClient":
+        obj = cls(calendar_id)
+        obj._creds = creds
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            self._token_path.write_text(creds.to_json(), "utf-8")
-        self._service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        obj._service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        return obj
+
+    # ---------- Hilfs-API ----------
+    def list_calendars(self) -> list[dict[str, str]]:
+        """Liste aller Google-Kalender des Nutzers als [{id, label}]."""
+        assert self._service is not None
+        out: list[dict[str, str]] = []
+        page = None
+        while True:
+            resp = self._service.calendarList().list(pageToken=page).execute()
+            for item in resp.get("items", []):
+                label = item.get("summaryOverride") or item.get("summary") or item["id"]
+                if item.get("primary"):
+                    label = f"★ {label}"
+                out.append({"id": item["id"], "label": label})
+            page = resp.get("nextPageToken")
+            if not page:
+                break
+        return out
 
     # ---------- Read ----------
     def fetch_events(self, days_back: int = 30, days_forward: int = 365) -> list[SyncEvent]:
@@ -62,7 +88,7 @@ class GoogleClient:
                 try:
                     out.append(self._parse(item))
                 except Exception as err:  # pragma: no cover
-                    _LOGGER.warning("Google-Event konnte nicht geparst werden: %s", err)
+                    _LOGGER.warning("Google-Event-Parse: %s", err)
             page_token = resp.get("nextPageToken")
             if not page_token:
                 break
@@ -95,17 +121,17 @@ class GoogleClient:
     # ---------- Write ----------
     def create_event(self, ev: SyncEvent) -> str:
         assert self._service is not None
-        body = self._to_body(ev)
         created = self._service.events().insert(
-            calendarId=self._calendar_id, body=body
+            calendarId=self._calendar_id, body=self._to_body(ev)
         ).execute()
         return created["id"]
 
     def update_event(self, google_id: str, ev: SyncEvent) -> None:
         assert self._service is not None
-        body = self._to_body(ev)
         self._service.events().update(
-            calendarId=self._calendar_id, eventId=google_id, body=body
+            calendarId=self._calendar_id,
+            eventId=google_id,
+            body=self._to_body(ev),
         ).execute()
 
     def delete_event(self, google_id: str) -> None:

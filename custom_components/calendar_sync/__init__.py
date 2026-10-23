@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_entry_oauth2_flow
 
 from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .coordinator import CalendarSyncCoordinator
@@ -14,12 +15,22 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Setze einen Config-Entry auf."""
+    implementation = (
+        await config_entry_oauth2_flow.async_get_config_entry_implementation(
+            hass, entry
+        )
+    )
+    oauth_session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
+    await oauth_session.async_ensure_token_valid()
+
     interval = entry.options.get(
         CONF_SCAN_INTERVAL, entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     )
     coordinator = CalendarSyncCoordinator(
-        hass, entry, update_interval=timedelta(seconds=interval)
+        hass,
+        entry,
+        oauth_session=oauth_session,
+        update_interval=timedelta(seconds=interval),
     )
     await coordinator.async_config_entry_first_refresh()
 
@@ -28,7 +39,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Entferne einen Config-Entry."""
     coordinator: CalendarSyncCoordinator | None = hass.data.get(DOMAIN, {}).pop(
         entry.entry_id, None
     )
