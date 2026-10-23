@@ -74,6 +74,11 @@ class ICloudClient:
             if all_day:
                 dtstart = datetime.combine(dtstart, datetime.min.time(), tzinfo=timezone.utc)
                 dtend = datetime.combine(dtend, datetime.min.time(), tzinfo=timezone.utc)
+            else:
+                if dtstart.tzinfo is None:
+                    dtstart = dtstart.replace(tzinfo=timezone.utc)
+                if dtend.tzinfo is None:
+                    dtend = dtend.replace(tzinfo=timezone.utc)
             last_mod = comp.get("LAST-MODIFIED") or comp.get("DTSTAMP")
             updated = last_mod.dt if last_mod else None
             return SyncEvent(
