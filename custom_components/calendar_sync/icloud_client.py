@@ -127,15 +127,15 @@ class ICloudClient:
                 self._calendar.save_event(ical)
                 return
         url = self._absolute_url(href)
-        resp = self._client.session.request(
-            "PUT",
+        resp = self._client.put(
             url,
-            data=ical.encode("utf-8"),
-            headers={"Content-Type": "text/calendar; charset=utf-8"},
+            ical.encode("utf-8"),
+            {"Content-Type": "text/calendar; charset=utf-8"},
         )
-        if resp.status_code >= 400:
+        status = getattr(resp, "status", getattr(resp, "status_code", 0))
+        if status and status >= 400:
             raise RuntimeError(
-                f"iCloud PUT {url} fehlgeschlagen: HTTP {resp.status_code}"
+                f"iCloud PUT {url} fehlgeschlagen: HTTP {status}"
             )
 
     def _absolute_url(self, href: str) -> str:
