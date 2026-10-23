@@ -28,7 +28,7 @@ Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder sp�
 
 - Menü „Konfigurieren“: Sync pausieren, Intervall, Kalender wechseln – ohne Neueinrichtung.
 - Eintrag wird nach Kalenderwechsel umbenannt; Google-Kalender mit Namen statt ID.
-- Neuer Name „Google iCloud Calendar 2-way Sync“, eigenes Icon.
+- Neuer Name „Calendar 2-way Sync – Google ↔ iCloud“ (ab 0.5.1), eigenes Icon.
 - Icons liegen unter `custom_components/calendar_sync/brand/` (Brands-Proxy ab HA 2026.3; ein PR an `home-assistant/brands` wird für Custom-Integrationen nicht mehr angenommen).
 
 ## 0.4.0 – Erste stabile Version

@@ -1,4 +1,4 @@
-# Google iCloud Calendar 2-way Sync
+# Calendar 2-way Sync – Google ↔ iCloud
 
 Home-Assistant-Integration (HACS), die einen **Google-Kalender** und einen **iCloud-Kalender** (z. B. einen Familienkalender) in **beide Richtungen** synchron hält.
 
@@ -108,7 +108,7 @@ Google erlaubt Zugriff auf private Kalender nur per **OAuth**. Dafür brauchst d
 
 1. HACS → oben rechts **⋮** → **Benutzerdefinierte Repositories**.
 2. URL `https://github.com/daloki83/ha-calendar-sync`, Typ **Integration** → **Hinzufügen**.
-3. **Google iCloud Calendar 2-way Sync** suchen → **Herunterladen**.
+3. **Calendar 2-way Sync – Google ↔ iCloud** suchen → **Herunterladen**.
 4. Home Assistant **neu starten**.
 
 ---
@@ -119,13 +119,13 @@ Google erlaubt Zugriff auf private Kalender nur per **OAuth**. Dafür brauchst d
 
 1. **Einstellungen** → **Geräte & Dienste** → oben rechts **⋮** → **Anwendungs-Zugangsdaten**.
 2. **+ Anwendungs-Zugangsdaten hinzufügen**:
-   - Integration: **Google iCloud Calendar 2-way Sync**
+   - Integration: **Calendar 2-way Sync – Google ↔ iCloud**
    - Name: beliebig
    - OAuth Client ID und Client Secret aus Schritt 4.4 einfügen.
 
 ### 6.2 Integration hinzufügen
 
-1. **Einstellungen** → **Geräte & Dienste** → **+ Integration hinzufügen** → **Google iCloud Calendar 2-way Sync**.
+1. **Einstellungen** → **Geräte & Dienste** → **+ Integration hinzufügen** → **Calendar 2-way Sync – Google ↔ iCloud**.
 2. **Google:** Zugangsdaten auswählen → Google-Login öffnet sich.
    - Warnung „Google hat diese App nicht überprüft“: **Erweitert** → **… aufrufen (unsicher)**. Das ist bei eigenen Testing-Apps normal.
    - Kalenderzugriff erlauben.
@@ -171,7 +171,7 @@ Sync-Lauf: {'created_g': 0, 'created_i': 0, 'updated': 0, 'deleted': 0, 'matched
 
 ## 8. Einstellungen ändern
 
-**Einstellungen** → **Geräte & Dienste** → **Google iCloud Calendar 2-way Sync** → **⚙ (Konfigurieren)** am Eintrag:
+**Einstellungen** → **Geräte & Dienste** → **Calendar 2-way Sync – Google ↔ iCloud** → **⚙ (Konfigurieren)** am Eintrag:
 
 - **Synchronisation aktiv** – Sync pausieren oder fortsetzen. Pausiert wird nichts gelesen oder geschrieben.
 - **Sync-Intervall in Sekunden**

@@ -1,7 +1,7 @@
 {
   "domain": "calendar_sync",
-  "name": "Google iCloud Calendar 2-way Sync",
-  "version": "0.5.0",
+  "name": "Calendar 2-way Sync - Google ↔ iCloud",
+  "version": "0.5.1",
   "documentation": "https://github.com/daloki83/ha-calendar-sync",
   "issue_tracker": "https://github.com/daloki83/ha-calendar-sync/issues",
   "codeowners": ["@daloki83"],
