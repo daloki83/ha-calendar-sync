@@ -19,6 +19,17 @@ from .models import SyncEvent
 _LOGGER = logging.getLogger(__name__)
 
 
+def _href_of(dav_event) -> str:
+    """Robuste Extraktion der href-URL eines caldav-Events."""
+    url = getattr(dav_event, "url", None)
+    if url is None:
+        return ""
+    path = getattr(url, "path", None)
+    if path:
+        return path
+    return str(url)
+
+
 class ICloudClient:
     def __init__(self, username: str, password: str, calendar_name: str) -> None:
         self._username = username
@@ -90,7 +101,7 @@ class ICloudClient:
                 description=str(comp.get("DESCRIPTION") or ""),
                 updated=updated,
                 icloud_uid=str(comp.get("UID")),
-                extra={"href": dav_event.url.path if hasattr(dav_event.url, "path") else str(dav_event.url)},
+                extra={"href": _href_of(dav_event)},
             )
         raise ValueError("Kein VEVENT in Resource gefunden")
 
@@ -101,19 +112,34 @@ class ICloudClient:
         uid = ev.icloud_uid or f"{uuid.uuid4()}@calendar-sync"
         ical = self._build_ical(ev, uid)
         dav_event = self._calendar.save_event(ical)
-        href = dav_event.url.path if hasattr(dav_event.url, "path") else str(dav_event.url)
-        return uid, href
+        return uid, _href_of(dav_event)
 
     def update_event(self, href: str, ev: SyncEvent, uid: str) -> None:
-        assert self._client is not None
-        ical = self._build_ical(ev, uid)
-        resource = caldav.Event(client=self._client, url=href, data=ical)
-        resource.save()
+        """Event per UID holen und mit neuem iCal überschreiben."""
+        assert self._calendar is not None
+        try:
+            existing = self._calendar.event_by_uid(uid)
+        except NotFoundError:
+            self.create_event(ev)
+            return
+        existing.data = self._build_ical(ev, uid)
+        existing.save()
 
     def delete_event(self, href: str) -> None:
-        assert self._client is not None
+        assert self._calendar is not None
+        # href wird ignoriert; wir brauchen UID
+        # Fallback: Versuch per URL
+        if not href:
+            return
         try:
             caldav.Event(client=self._client, url=href).delete()
+        except (NotFoundError, AttributeError):
+            pass
+
+    def delete_event_by_uid(self, uid: str) -> None:
+        assert self._calendar is not None
+        try:
+            self._calendar.event_by_uid(uid).delete()
         except NotFoundError:
             pass
 
