@@ -19,6 +19,22 @@ from .models import SyncEvent
 _LOGGER = logging.getLogger(__name__)
 
 
+def _extract_recurrence(comp) -> list[str]:
+    """Extrahiere RRULE/RDATE/EXDATE als iCal-Zeilen."""
+    out: list[str] = []
+    for name in ("RRULE", "RDATE", "EXDATE"):
+        prop = comp.get(name)
+        if prop is None:
+            continue
+        items = prop if isinstance(prop, list) else [prop]
+        for p in items:
+            try:
+                out.append(f"{name}:{p.to_ical().decode('utf-8')}")
+            except Exception:
+                out.append(f"{name}:{p}")
+    return out
+
+
 def _href_of(dav_event) -> str:
     """Robuste Extraktion der href-URL eines caldav-Events."""
     url = getattr(dav_event, "url", None)
@@ -92,6 +108,7 @@ class ICloudClient:
                     dtend = dtend.replace(tzinfo=timezone.utc)
             last_mod = comp.get("LAST-MODIFIED") or comp.get("DTSTAMP")
             updated = last_mod.dt if last_mod else None
+            recurrence = _extract_recurrence(comp)
             return SyncEvent(
                 summary=str(comp.get("SUMMARY") or ""),
                 start=dtstart,
@@ -99,6 +116,7 @@ class ICloudClient:
                 all_day=all_day,
                 location=str(comp.get("LOCATION") or ""),
                 description=str(comp.get("DESCRIPTION") or ""),
+                recurrence=recurrence,
                 updated=updated,
                 icloud_uid=str(comp.get("UID")),
                 extra={"href": _href_of(dav_event)},
@@ -189,4 +207,14 @@ class ICloudClient:
         vevent.add("dtstamp", datetime.now(timezone.utc))
         vevent.add("last-modified", datetime.now(timezone.utc))
         cal.add_component(vevent)
-        return cal.to_ical().decode("utf-8")
+        ical_text = cal.to_ical().decode("utf-8")
+        if ev.recurrence:
+            # Zeilen vor END:VEVENT einfügen
+            lines = ical_text.splitlines()
+            out: list[str] = []
+            for line in lines:
+                if line.startswith("END:VEVENT"):
+                    out.extend(ev.recurrence)
+                out.append(line)
+            ical_text = "\r\n".join(out) + "\r\n"
+        return ical_text

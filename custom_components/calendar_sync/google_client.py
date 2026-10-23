@@ -114,6 +114,7 @@ class GoogleClient:
             all_day=all_day,
             location=item.get("location", ""),
             description=item.get("description", ""),
+            recurrence=list(item.get("recurrence", [])),
             updated=updated,
             google_id=item["id"],
         )
@@ -154,9 +155,12 @@ class GoogleClient:
                 "start": {"dateTime": start.isoformat(), "timeZone": "UTC"},
                 "end": {"dateTime": end.isoformat(), "timeZone": "UTC"},
             }
-        return {
+        body = {
             "summary": ev.summary,
             "location": ev.location,
             "description": ev.description,
             **body_time,
         }
+        if ev.recurrence:
+            body["recurrence"] = list(ev.recurrence)
+        return body

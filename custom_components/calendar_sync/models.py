@@ -16,6 +16,9 @@ class SyncEvent:
     all_day: bool = False
     location: str = ""
     description: str = ""
+    # Serienregel als iCal-Zeilen (z. B. ["RRULE:FREQ=WEEKLY;BYDAY=MO"]);
+    # bei Einzelterminen leer.
+    recurrence: list[str] = field(default_factory=list)
     # Zeitpunkt der letzten Änderung auf der Quellseite (UTC)
     updated: datetime | None = None
     # Herkunfts-IDs (eine davon ist gesetzt, je nach Quelle)
@@ -32,6 +35,7 @@ class SyncEvent:
                 "1" if self.all_day else "0",
                 self.location.strip(),
                 self.description.strip(),
+                ";".join(sorted(self.recurrence)),
             ]
         )
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
