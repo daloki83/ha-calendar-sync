@@ -35,7 +35,21 @@ class SyncEvent:
                 "1" if self.all_day else "0",
                 self.location.strip(),
                 self.description.strip(),
-                ";".join(sorted(self.recurrence)),
+                _normalize_recurrence(self.recurrence),
             ]
         )
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _normalize_recurrence(lines: list[str]) -> str:
+    """Kanonisiere RRULE/RDATE/EXDATE, damit Google- und iCloud-Varianten gleich hashen."""
+    canon: list[str] = []
+    for raw in lines:
+        name, _, value = raw.partition(":")
+        name = name.strip().upper()
+        # Parameter sortieren (RRULE: FREQ=WEEKLY;BYDAY=MO == BYDAY=MO;FREQ=WEEKLY)
+        parts = [p.strip().upper() for p in value.strip().split(";") if p.strip()]
+        parts.sort()
+        canon.append(f"{name}:{';'.join(parts)}")
+    canon.sort()
+    return "||".join(canon)
