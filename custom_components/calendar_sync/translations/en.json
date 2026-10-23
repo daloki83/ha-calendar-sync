@@ -2,19 +2,26 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up Calendar Sync",
-        "description": "Connect your iCloud family calendar. Google will be connected in a later step.",
+        "title": "Sign in to iCloud",
+        "description": "Create an app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords.",
         "data": {
           "icloud_username": "Apple ID (email)",
-          "icloud_password": "App-specific password",
-          "icloud_calendar": "iCloud calendar name",
+          "icloud_password": "App-specific password"
+        }
+      },
+      "pick": {
+        "title": "Pick calendar",
+        "description": "Choose which iCloud calendar to sync.",
+        "data": {
+          "icloud_calendar": "iCloud calendar",
           "google_calendar_id": "Google calendar ID (used later; 'primary' = main calendar)",
           "scan_interval": "Sync interval in seconds"
         }
       }
     },
     "error": {
-      "icloud_auth": "iCloud login failed or calendar not found"
+      "icloud_auth": "iCloud login failed – check credentials",
+      "no_calendars": "No calendars found"
     },
     "abort": {
       "already_configured": "This calendar is already configured"
