@@ -45,3 +45,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator is not None:
         await coordinator.async_shutdown()
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Beim endgültigen Entfernen die Mapping-DB mit löschen."""
+    from pathlib import Path
+    from .const import DB_FILENAME
+    db_path = Path(hass.config.path(DOMAIN)) / DB_FILENAME
+    if db_path.exists():
+        try:
+            db_path.unlink()
+            _LOGGER.info("Mapping-DB entfernt: %s", db_path)
+        except OSError as err:
+            _LOGGER.warning("Konnte Mapping-DB nicht löschen: %s", err)
