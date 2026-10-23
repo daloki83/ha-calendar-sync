@@ -2,6 +2,13 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.0.0 – Go-Live 🚀
+
+Erste öffentlich stabile Version. Alle bisherigen Fixes und Features sind drin, am Produktivkalender erprobt, die Dokumentation ist auf Deutsch und Englisch komplett.
+
+Enthalten gegenüber 0.5.1:
+- Zweisprachiges README mit Sprach-Picker (0.5.2).
+
 ## 0.5.0 – Sicherheitscheck und Doku
 
 - Zugangsdaten werden nur noch an `https://…icloud.com` gesendet.
