@@ -133,7 +133,9 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             if mapping.google_id in google_events:
                 continue
             if mapping.icloud_uid in icloud_events:
-                self._icloud.delete_event_by_uid(mapping.icloud_uid)
+                iev = icloud_events[mapping.icloud_uid]
+                href = iev.extra.get("href") or mapping.icloud_href
+                self._icloud.delete_event(href)
                 stats["deleted"] += 1
             self._db.delete_by_google(mapping.google_id)
 

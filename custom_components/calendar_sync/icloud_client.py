@@ -145,20 +145,26 @@ class ICloudClient:
         return base + ("/" + href.lstrip("/"))
 
     def delete_event(self, href: str) -> None:
-        assert self._calendar is not None
-        # href wird ignoriert; wir brauchen UID
-        # Fallback: Versuch per URL
+        """Direktes CalDAV-DELETE auf die Event-URL."""
+        assert self._client is not None
         if not href:
             return
+        url = self._absolute_url(href)
         try:
-            caldav.Event(client=self._client, url=href).delete()
-        except (NotFoundError, AttributeError):
+            resp = self._client.delete(url)
+            status = getattr(resp, "status", getattr(resp, "status_code", 0))
+            if status and status not in (200, 204, 404):
+                raise RuntimeError(f"iCloud DELETE {url}: HTTP {status}")
+        except NotFoundError:
             pass
 
     def delete_event_by_uid(self, uid: str) -> None:
+        """Fallback über UID-Lookup, falls kein href bekannt."""
         assert self._calendar is not None
         try:
-            self._calendar.event_by_uid(uid).delete()
+            ev = self._calendar.event_by_uid(uid)
+            href = _href_of(ev)
+            self.delete_event(href)
         except NotFoundError:
             pass
 
