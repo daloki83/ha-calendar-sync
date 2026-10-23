@@ -5,7 +5,8 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow, selector
 
 from .const import (
@@ -33,6 +34,11 @@ class CalendarSyncOAuth2FlowHandler(
 
     DOMAIN = DOMAIN
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
+        return CalendarSyncOptionsFlow(entry)
 
     def __init__(self) -> None:
         super().__init__()
@@ -175,3 +181,120 @@ def _google_label(calendars: list[dict[str, str]], cid: str) -> str:
         if c["id"] == cid:
             return c["label"]
     return cid
+
+
+class CalendarSyncOptionsFlow(OptionsFlow):
+    """Menü zum Pausieren, Intervall-Ändern, Kalender-Wechseln."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        self._icloud_calendars: list[str] = []
+        self._google_calendars: list[dict[str, str]] = []
+
+    def _opt(self, key: str, default):
+        return self._entry.options.get(key, self._entry.data.get(key, default))
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Hauptmenü."""
+        if user_input is not None:
+            # Toggle-/Intervall-Formular wurde abgesendet, oder "Kalender wechseln" gewählt
+            if user_input.get("change_calendars"):
+                return await self.async_step_pick_calendars()
+            # Reine Options aktualisieren
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_SYNC_ENABLED: user_input[CONF_SYNC_ENABLED],
+                    CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    CONF_ICLOUD_CALENDAR: self._opt(CONF_ICLOUD_CALENDAR, ""),
+                    CONF_GOOGLE_CALENDAR_ID: self._opt(CONF_GOOGLE_CALENDAR_ID, "primary"),
+                },
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_SYNC_ENABLED,
+                    default=self._opt(CONF_SYNC_ENABLED, False),
+                ): bool,
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                ): int,
+                vol.Optional("change_calendars", default=False): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            description_placeholders={
+                "icloud_calendar": self._opt(CONF_ICLOUD_CALENDAR, "?"),
+                "google_calendar_id": self._opt(CONF_GOOGLE_CALENDAR_ID, "?"),
+            },
+        )
+
+    async def async_step_pick_calendars(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Kalenderauswahl neu."""
+        errors: dict[str, str] = {}
+        if not self._icloud_calendars or not self._google_calendars:
+            try:
+                self._icloud_calendars = await self.hass.async_add_executor_job(
+                    _list_icloud_calendars,
+                    self._entry.data[CONF_ICLOUD_USERNAME],
+                    self._entry.data[CONF_ICLOUD_PASSWORD],
+                )
+                token_data = {
+                    "auth_implementation": self._entry.data.get("auth_implementation"),
+                    "token": self._entry.data.get("token", {}),
+                }
+                self._google_calendars = await self.hass.async_add_executor_job(
+                    _list_google_calendars, token_data
+                )
+            except Exception:  # noqa: BLE001
+                return self.async_abort(reason="refetch_failed")
+
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_SYNC_ENABLED: self._opt(CONF_SYNC_ENABLED, False),
+                    CONF_SCAN_INTERVAL: self._opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                    CONF_ICLOUD_CALENDAR: user_input[CONF_ICLOUD_CALENDAR],
+                    CONF_GOOGLE_CALENDAR_ID: user_input[CONF_GOOGLE_CALENDAR_ID],
+                    "reset_mapping": True,
+                },
+            )
+
+        google_options = [
+            selector.SelectOptionDict(value=c["id"], label=c["label"])
+            for c in self._google_calendars
+        ]
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_ICLOUD_CALENDAR,
+                    default=self._opt(CONF_ICLOUD_CALENDAR, ""),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=self._icloud_calendars,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_GOOGLE_CALENDAR_ID,
+                    default=self._opt(CONF_GOOGLE_CALENDAR_ID, "primary"),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=google_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="pick_calendars", data_schema=schema, errors=errors
+        )

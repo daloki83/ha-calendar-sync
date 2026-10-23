@@ -41,6 +41,30 @@
       "default": "Google erfolgreich verbunden."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Calendar Sync Einstellungen",
+        "description": "Aktueller iCloud-Kalender: **{icloud_calendar}**\nAktueller Google-Kalender: **{google_calendar_id}**",
+        "data": {
+          "sync_enabled": "Synchronisation aktiv",
+          "scan_interval": "Sync-Intervall in Sekunden",
+          "change_calendars": "Kalender wechseln (nächster Schritt – setzt Mapping zurück)"
+        }
+      },
+      "pick_calendars": {
+        "title": "Kalender wechseln",
+        "description": "Achtung: Beim Wechsel wird die Mapping-Datenbank gelöscht.",
+        "data": {
+          "icloud_calendar": "iCloud-Kalender",
+          "google_calendar_id": "Google-Kalender"
+        }
+      }
+    },
+    "abort": {
+      "refetch_failed": "Kalender konnten nicht neu geladen werden"
+    }
+  },
   "application_credentials": {
     "description": "Lege in deinem [Google Cloud Projekt]({console_url}) eine OAuth-Client-ID (Typ 'Webanwendung') an. Als autorisierten Redirect-URI eintragen: `{redirect_url}`."
   }
