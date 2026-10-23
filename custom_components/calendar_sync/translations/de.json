@@ -19,7 +19,8 @@
         "data": {
           "icloud_calendar": "iCloud-Kalender",
           "google_calendar_id": "Google-Kalender",
-          "scan_interval": "Sync-Intervall in Sekunden"
+          "scan_interval": "Sync-Intervall in Sekunden",
+          "sync_enabled": "Synchronisation aktivieren (zunächst AUS lassen zum Testen)"
         }
       }
     },
