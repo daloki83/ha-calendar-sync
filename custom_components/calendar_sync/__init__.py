@@ -62,6 +62,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=timedelta(seconds=interval),
     )
     await coordinator.async_config_entry_first_refresh()
+    # Ohne Entitäten hat der Coordinator keine Listener und plant dann keine
+    # weiteren Läufe ein – ein leerer Listener hält das Intervall am Leben.
+    entry.async_on_unload(coordinator.async_add_listener(lambda: None))
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
