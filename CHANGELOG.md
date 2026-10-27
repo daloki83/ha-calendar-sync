@@ -12,7 +12,9 @@ Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder sp�
 1. **Heimatseite:** Jeder Termin gehört der Seite, auf der er entstanden ist. Nur von dort wird übertragen, überschrieben oder gelöscht wird immer nur die Kopie. „Die letzte Änderung gewinnt“ entfällt.
 2. **iCloud-Originale sind tabu:** Fehlt die Google-Kopie, wird sie neu angelegt, das Original bleibt. Zusätzlich verweigert der iCloud-Client jedes Ändern und Löschen von Terminen ohne `@calendar-sync` in der UID.
 3. **Bug behoben:** Kopien aus dem laufenden Lauf gelten nicht mehr als gelöscht.
-4. **Tests** spielen den Vorfall und die Regeln mit Fake-Kalendern durch und laufen in der CI.
+4. **Kopien kennen ihr Original:** Neue und geänderte Kopien tragen dessen Kennung (iCloud: `X-CALSYNC-SOURCE`, Google: `source_uid`). Geht die Zuordnungsliste verloren, werden die Paare daraus wiederhergestellt statt doppelt angelegt.
+5. **Kopien werden nie Quelle:** Eine Kopie ohne zugeordnetes Original wird weder weiterkopiert noch gelöscht, nur übersprungen.
+6. **Tests** spielen den Vorfall, den Verlust der Zuordnungsliste und die Regeln mit Fake-Kalendern durch und laufen in der CI.
 
 ## 1.1.3 – Absturz von Home Assistant behoben
 

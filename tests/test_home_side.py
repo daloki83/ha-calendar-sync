@@ -42,13 +42,17 @@ class FakeICloud:
 
     def create_event(self, ev):
         uid = f"copy-{next(_ids)}@calendar-sync"
-        self.events[uid] = _ev(ev.summary, icloud_uid=uid, extra={"href": f"/{uid}.ics"})
+        self.events[uid] = _ev(
+            ev.summary, icloud_uid=uid, extra={"href": f"/{uid}.ics", "source": ev.google_id}
+        )
         self.writes.append(("create", uid))
         return uid, f"/{uid}.ics"
 
     def update_event(self, href, ev, uid):
         _ensure_own(uid)
-        self.events[uid] = _ev(ev.summary, icloud_uid=uid, extra={"href": href})
+        self.events[uid] = _ev(
+            ev.summary, icloud_uid=uid, extra={"href": href, "source": ev.google_id}
+        )
         self.writes.append(("update", uid))
 
     def delete_event(self, href, uid):
@@ -71,12 +75,15 @@ class FakeGoogle:
 
     def create_event(self, ev):
         gid = f"g-{next(_ids)}"
-        self.events[gid] = _ev(ev.summary, google_id=gid, extra={"ours": True})
+        self.events[gid] = _ev(
+            ev.summary, google_id=gid, extra={"ours": True, "source": ev.icloud_uid}
+        )
         return gid
 
     def update_event(self, gid, ev):
-        ours = self.events[gid].extra["ours"]
-        self.events[gid] = _ev(ev.summary, google_id=gid, extra={"ours": ours})
+        self.events[gid] = _ev(
+            ev.summary, google_id=gid, extra={"ours": True, "source": ev.icloud_uid}
+        )
 
     def delete_event(self, gid):
         self.events.pop(gid, None)
@@ -153,6 +160,37 @@ def test_google_original_flows_to_icloud_copy(env):
     del google.events[gid]
     c._sync_once({})
     assert icloud.events == {}
+
+
+def test_links_restored_from_copies_after_db_loss(env):
+    c, icloud, google = env
+    i_uid = icloud.add_original("Arzt")
+    g_id = google.add_original("Pia Schule")
+    c._sync_once({})
+    # Zuordnungen weg, aber Löschungen wären aktiv
+    c._db.clear()
+    c._db.set_meta("pair", "g|Familie")
+    c._db.set_meta("initialized", "1")
+    # Originale ändern, damit kein Inhaltsvergleich hilft
+    icloud.events[i_uid] = _ev("Arzt neu", icloud_uid=i_uid, extra={"href": f"/{i_uid}.ics"})
+    google.events[g_id] = _ev("Pia Schule neu", google_id=g_id, extra={"ours": False})
+    c._sync_once({})
+    assert len(icloud.events) == 2 and len(google.events) == 2
+    assert sorted(e.summary for e in google.events.values()) == ["Arzt neu", "Pia Schule neu"]
+    assert sorted(e.summary for e in icloud.events.values()) == ["Arzt neu", "Pia Schule neu"]
+    assert i_uid in icloud.events
+
+
+def test_copies_never_become_sources(env):
+    c, icloud, google = env
+    google.events["g-x"] = _ev("Fremd", google_id="g-x", extra={"ours": True, "source": "weg"})
+    uid = "x@calendar-sync"
+    icloud.events[uid] = _ev("Alt", icloud_uid=uid, extra={"href": "/x.ics", "source": "g-weg"})
+    c._sync_once({})
+    c._sync_once({})
+    assert list(google.events) == ["g-x"]
+    assert list(icloud.events) == [uid]
+    assert icloud.writes == []
 
 
 def test_guard_refuses_icloud_original():

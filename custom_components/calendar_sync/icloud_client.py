@@ -16,6 +16,9 @@ from caldav.lib.error import NotFoundError
 from icalendar import Calendar, Event
 
 from .const import ICLOUD_CALDAV_URL, OWN_UID_SUFFIX
+
+# Kopien tragen die Google-ID ihres Originals in diesem Feld
+SOURCE_PROP = "X-CALSYNC-SOURCE"
 from .models import SyncEvent
 
 
@@ -151,7 +154,11 @@ class ICloudClient:
                 timezone=tz_name,
                 updated=updated,
                 icloud_uid=str(comp.get("UID")),
-                extra={"href": _href_of(dav_event)},
+                # Google-ID des Originals (Kopien ab v1.2)
+                extra={
+                    "href": _href_of(dav_event),
+                    "source": str(comp.get(SOURCE_PROP) or ""),
+                },
             )
         raise ValueError("Kein VEVENT in Resource gefunden")
 
@@ -252,6 +259,8 @@ class ICloudClient:
             vevent.add("location", ev.location)
         if ev.description:
             vevent.add("description", ev.description)
+        if ev.google_id:
+            vevent.add(SOURCE_PROP, ev.google_id)
         vevent.add("dtstamp", datetime.now(timezone.utc))
         vevent.add("last-modified", datetime.now(timezone.utc))
         cal.add_component(vevent)

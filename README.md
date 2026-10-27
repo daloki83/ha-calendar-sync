@@ -272,7 +272,7 @@ Nur **Administratoren** dürfen den Dienst ausführen.
 - **Löschungen werden erst geplant**, dann gegen den Löschschutz geprüft (siehe Kapitel 8) und erst danach ausgeführt.
 - **Änderungserkennung:** Pro Lauf werden beide Seiten gelesen und Hashes verglichen. Zeiten werden dafür auf UTC normalisiert, Serienregeln vereinheitlicht – so erzeugen unterschiedliche Schreibweisen von Google und Apple keine Scheinänderungen.
 - **Löschungen:** Fehlt ein verknüpftes Original, wird seine Kopie gelöscht. Fehlt eine Kopie, bleibt das Original unverändert und die Kopie wird neu angelegt. iCloud-Termine ohne `@calendar-sync` in der UID verweigert der iCloud-Client grundsätzlich zu ändern oder zu löschen.
-- **Herkunftsmarkierung:** In iCloud angelegte Kopien haben eine UID mit `@calendar-sync`, in Google angelegte Kopien eine unsichtbare Eigenschaft `calendar_sync=1`.
+- **Herkunftsmarkierung:** In iCloud angelegte Kopien haben eine UID mit `@calendar-sync` und im Feld `X-CALSYNC-SOURCE` die Google-ID ihres Originals; in Google angelegte Kopien haben die unsichtbaren Eigenschaften `calendar_sync=1` und `source_uid` (UID des iCloud-Originals). Geht die Zuordnungsliste verloren, werden die Paare daraus wiederhergestellt. Kopien werden nie selbst weiterkopiert.
 - **Entfernen des Eintrags** löscht auch die Zuordnungsliste. Die Kalender selbst bleiben unverändert.
 
 ---
@@ -591,7 +591,7 @@ Only **administrators** may run the service.
 - **Deletions are planned first**, checked against the deletion protection (see chapter 8), and only then executed.
 - **Change detection:** On every run, both sides are read and hashes compared. Times are normalized to UTC and recurrence rules canonicalized – so different notations by Google and Apple do not produce fake changes.
 - **Deletions:** If a linked original is missing, its copy is deleted. If a copy is missing, the original stays untouched and the copy is recreated. The iCloud client refuses to change or delete any iCloud event whose UID does not end in `@calendar-sync`.
-- **Origin marker:** Copies created in iCloud have a UID with `@calendar-sync`; copies created in Google have an invisible property `calendar_sync=1`.
+- **Origin marker:** Copies created in iCloud have a UID with `@calendar-sync` and the Google ID of their original in `X-CALSYNC-SOURCE`; copies created in Google have the invisible properties `calendar_sync=1` and `source_uid` (UID of the iCloud original). If the mapping list is lost, pairs are restored from these markers. Copies are never copied on.
 - **Removing the entry** also deletes the mapping list. The calendars themselves stay unchanged.
 
 ---
