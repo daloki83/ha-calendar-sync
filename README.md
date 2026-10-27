@@ -42,7 +42,7 @@ Die Integration bringt eigene Clients für Google und iCloud mit und ist unabhä
 | Teilnehmer, Erinnerungen, Anhänge, Farben | ❌ | ❌ |
 | Einzeln geänderte Termine einer Serie | ❌ | ❌ |
 
-- **Konfliktregel:** Wurde ein Termin auf beiden Seiten geändert, gewinnt die **zuletzt geänderte** Seite (Last-Write-Wins).
+- **Heimatseite:** Jeder Termin gehört der Seite, auf der er entstanden ist, und nur von dort wird übertragen. Änderungen an der Kopie werden beim nächsten Lauf vom Original überschrieben. **In iCloud angelegte Termine ändert oder löscht die Integration nie**; wird ihre Google-Kopie gelöscht, entsteht sie neu.
 - **Zeitfenster:** Synchronisiert werden Termine von **30 Tagen in der Vergangenheit bis 365 Tage in der Zukunft**. Serien werden über ihren Starttermin erfasst.
 - **Intervall:** Standardmäßig alle 300 Sekunden (5 Minuten), einstellbar.
 
@@ -169,8 +169,8 @@ Sync-Lauf: {'created_g': 0, 'created_i': 0, 'updated': 0, 'deleted': 0, 'matched
 |---|---|
 | `created_g` | in Google neu angelegt |
 | `created_i` | in iCloud neu angelegt |
-| `updated` | geändert (Last-Write-Wins) |
-| `deleted` | gelöscht, weil auf der anderen Seite gelöscht |
+| `updated` | Kopie an das Original angeglichen |
+| `deleted` | Kopie gelöscht, weil das Original gelöscht wurde |
 | `matched` | vorhandene gleiche Termine verknüpft |
 
 ---
@@ -271,7 +271,7 @@ Nur **Administratoren** dürfen den Dienst ausführen.
 - **Zuordnungsliste:** Pro Eintrag eine SQLite-Datei unter `config/calendar_sync/<entry_id>.db`. Sie merkt sich, welcher Google-Termin zu welchem iCloud-Termin gehört, plus einen Prüfwert (Hash) des zuletzt synchronisierten Inhalts, und für welches Kalenderpaar die Zuordnungen gelten.
 - **Löschungen werden erst geplant**, dann gegen den Löschschutz geprüft (siehe Kapitel 8) und erst danach ausgeführt.
 - **Änderungserkennung:** Pro Lauf werden beide Seiten gelesen und Hashes verglichen. Zeiten werden dafür auf UTC normalisiert, Serienregeln vereinheitlicht – so erzeugen unterschiedliche Schreibweisen von Google und Apple keine Scheinänderungen.
-- **Löschungen:** Fehlt ein bereits verknüpfter Termin auf einer Seite, wird er auf der anderen Seite ebenfalls gelöscht.
+- **Löschungen:** Fehlt ein verknüpftes Original, wird seine Kopie gelöscht. Fehlt eine Kopie, bleibt das Original unverändert und die Kopie wird neu angelegt. iCloud-Termine ohne `@calendar-sync` in der UID verweigert der iCloud-Client grundsätzlich zu ändern oder zu löschen.
 - **Herkunftsmarkierung:** In iCloud angelegte Kopien haben eine UID mit `@calendar-sync`, in Google angelegte Kopien eine unsichtbare Eigenschaft `calendar_sync=1`.
 - **Entfernen des Eintrags** löscht auch die Zuordnungsliste. Die Kalender selbst bleiben unverändert.
 
@@ -361,7 +361,7 @@ The integration ships its own Google and iCloud clients and is independent of Ho
 | Attendees, reminders, attachments, colors | ❌ | ❌ |
 | Single modified instances of a series | ❌ | ❌ |
 
-- **Conflict rule:** If an event was changed on both sides, the **most recently changed** side wins (last-write-wins).
+- **Home side:** Every event belongs to the side it was created on, and only that side is synced from. Changes to the copy are overwritten by the original on the next run. **Events created in iCloud are never changed or deleted by the integration**; if their Google copy is deleted, it is recreated.
 - **Time window:** Events from **30 days in the past to 365 days in the future** are synced. Recurring events are picked up by their start date.
 - **Interval:** Every 300 seconds (5 minutes) by default, configurable.
 
@@ -488,8 +488,8 @@ Sync-Lauf: {'created_g': 0, 'created_i': 0, 'updated': 0, 'deleted': 0, 'matched
 |---|---|
 | `created_g` | newly created in Google |
 | `created_i` | newly created in iCloud |
-| `updated` | changed (last-write-wins) |
-| `deleted` | deleted because deleted on the other side |
+| `updated` | copy updated to match the original |
+| `deleted` | copy deleted because the original was deleted |
 | `matched` | existing identical events linked |
 
 ---
@@ -590,7 +590,7 @@ Only **administrators** may run the service.
 - **Mapping list:** One SQLite file per entry at `config/calendar_sync/<entry_id>.db`. It remembers which Google event matches which iCloud event, a checksum (hash) of the last synced content, and which calendar pair the mappings belong to.
 - **Deletions are planned first**, checked against the deletion protection (see chapter 8), and only then executed.
 - **Change detection:** On every run, both sides are read and hashes compared. Times are normalized to UTC and recurrence rules canonicalized – so different notations by Google and Apple do not produce fake changes.
-- **Deletions:** If an already-linked event is missing on one side, it is also deleted on the other.
+- **Deletions:** If a linked original is missing, its copy is deleted. If a copy is missing, the original stays untouched and the copy is recreated. The iCloud client refuses to change or delete any iCloud event whose UID does not end in `@calendar-sync`.
 - **Origin marker:** Copies created in iCloud have a UID with `@calendar-sync`; copies created in Google have an invisible property `calendar_sync=1`.
 - **Removing the entry** also deletes the mapping list. The calendars themselves stay unchanged.
 

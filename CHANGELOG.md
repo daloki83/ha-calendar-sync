@@ -2,6 +2,18 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.2.0 – Heimatseite: iCloud-Originale sind tabu
+
+**Vorfall:** Ein neu in iCloud „Familie“ angelegter Termin (23.12., „[P] Frauenarzt“) wurde gelöscht und 5 Minuten später aus der Google-Kopie neu angelegt. Erinnerungen und alle anderen Angaben, die das Tool nicht kennt, gingen verloren.
+
+**Ursache:** Die Löschprüfung verglich die Zuordnungen mit der Google-Liste vom Anfang des Laufs. Die Google-Kopie, die im selben Lauf angelegt wurde, fehlte darin und galt deshalb als „in Google gelöscht“. Das iCloud-Original wurde gelöscht; die Löschbremse stand auf 1 und hielt eine einzelne Löschung nicht auf. Dahinter stand ein Grundproblem: Bei Abweichungen gewann die jüngere Seite, und eine Google-Kopie ist immer jünger als ihr iCloud-Original.
+
+**Neuer Ansatz:**
+1. **Heimatseite:** Jeder Termin gehört der Seite, auf der er entstanden ist. Nur von dort wird übertragen, überschrieben oder gelöscht wird immer nur die Kopie. „Die letzte Änderung gewinnt“ entfällt.
+2. **iCloud-Originale sind tabu:** Fehlt die Google-Kopie, wird sie neu angelegt, das Original bleibt. Zusätzlich verweigert der iCloud-Client jedes Ändern und Löschen von Terminen ohne `@calendar-sync` in der UID.
+3. **Bug behoben:** Kopien aus dem laufenden Lauf gelten nicht mehr als gelöscht.
+4. **Tests** spielen den Vorfall und die Regeln mit Fake-Kalendern durch und laufen in der CI.
+
 ## 1.1.3 – Absturz von Home Assistant behoben
 
 **Fehlerbild:** Ab v1.1.1 stürzte Home Assistant etwa stündlich ab (Exit-Code 139, Segfault). Laut Crash-Protokoll stand ein Thread in `MappingDB.get_meta`, während ein anderer `MappingDB.close` ausführte.

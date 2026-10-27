@@ -21,6 +21,8 @@ DELETE_RATIO_MIN_MAPPINGS = 10
 DELETE_RATIO = 0.2
 
 ICLOUD_CALDAV_URL = "https://caldav.icloud.com"
+# UID-Endung der iCloud-Kopien, die das Tool selbst anlegt. Nur die darf es ändern oder löschen.
+OWN_UID_SUFFIX = "@calendar-sync"
 
 # Bis v1.0.x eine gemeinsame DB für alle Einträge; seit v1.1 eine pro Eintrag
 LEGACY_DB_FILENAME = "calendar_sync_mapping.db"

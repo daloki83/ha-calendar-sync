@@ -15,8 +15,14 @@ import caldav
 from caldav.lib.error import NotFoundError
 from icalendar import Calendar, Event
 
-from .const import ICLOUD_CALDAV_URL
+from .const import ICLOUD_CALDAV_URL, OWN_UID_SUFFIX
 from .models import SyncEvent
+
+
+def _ensure_own(uid: str) -> None:
+    # Letzte Sperre: Termine, die in iCloud angelegt wurden, fasst das Tool nie an
+    if not (uid or "").endswith(OWN_UID_SUFFIX):
+        raise RuntimeError(f"iCloud-Original {uid!r} wird nicht verändert")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +159,7 @@ class ICloudClient:
     def create_event(self, ev: SyncEvent) -> tuple[str, str]:
         """Lege ein Event an. Rückgabe: (uid, href)."""
         assert self._calendar is not None
-        uid = ev.icloud_uid or f"{uuid.uuid4()}@calendar-sync"
+        uid = f"{uuid.uuid4()}{OWN_UID_SUFFIX}"
         ical = self._build_ical(ev, uid)
         dav_event = self._calendar.save_event(ical)
         return uid, _href_of(dav_event)
@@ -161,6 +167,7 @@ class ICloudClient:
     def update_event(self, href: str, ev: SyncEvent, uid: str) -> None:
         """Direkter CalDAV-PUT auf die bekannte Event-URL ohne ETag-Check."""
         assert self._client is not None and self._calendar is not None
+        _ensure_own(uid)
         ical = self._build_ical(ev, uid)
         if not href:
             # Fallback: Lookup per UID, dann PUT auf dessen URL
@@ -195,9 +202,10 @@ class ICloudClient:
             raise RuntimeError(f"Unerwarteter CalDAV-Host verweigert: {host}")
         return href
 
-    def delete_event(self, href: str) -> None:
+    def delete_event(self, href: str, uid: str) -> None:
         """Direktes CalDAV-DELETE auf die Event-URL."""
         assert self._client is not None
+        _ensure_own(uid)
         if not href:
             return
         url = self._absolute_url(href)
@@ -215,7 +223,7 @@ class ICloudClient:
         try:
             ev = self._calendar.event_by_uid(uid)
             href = _href_of(ev)
-            self.delete_event(href)
+            self.delete_event(href, uid)
         except NotFoundError:
             pass
 
