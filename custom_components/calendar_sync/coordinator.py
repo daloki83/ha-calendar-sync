@@ -46,7 +46,8 @@ def issue_id_for(entry_id: str) -> str:
 def home_side(icloud_uid: str, google_ours: bool) -> str | None:
     """Seite, auf der ein Termin entstanden ist. Nur von dort wird übertragen."""
     if icloud_uid.endswith(OWN_UID_SUFFIX):
-        return "google"
+        # Beide Seiten Kopien (Altlast des Lösch-Bugs bis v1.1.3): iCloud ist, was die Familie pflegt
+        return "icloud" if google_ours else "google"
     if google_ours:
         return "icloud"
     return None  # zwei Originale, nur verknüpft: keine Seite wird überschrieben
@@ -347,9 +348,14 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             return
 
         keys = frozenset(f"{d.side}:{d.key}" for d in planned)
-        too_many = len(planned) > self._delete_threshold or (
-            mapped_count >= DELETE_RATIO_MIN_MAPPINGS
-            and len(planned) > mapped_count * DELETE_RATIO
+        # Löschungen in iCloud brauchen immer eine Freigabe, unabhängig von der Schwelle
+        too_many = (
+            any(d.side == "icloud" for d in planned)
+            or len(planned) > self._delete_threshold
+            or (
+                mapped_count >= DELETE_RATIO_MIN_MAPPINGS
+                and len(planned) > mapped_count * DELETE_RATIO
+            )
         )
         if too_many and not keys <= self._approved_keys:
             _LOGGER.warning(

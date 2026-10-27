@@ -13,7 +13,7 @@ import pytest
 from custom_components.calendar_sync import coordinator as coord_mod
 from custom_components.calendar_sync.coordinator import CalendarSyncCoordinator
 from custom_components.calendar_sync.icloud_client import _ensure_own
-from custom_components.calendar_sync.mapping_db import MappingDB
+from custom_components.calendar_sync.mapping_db import Mapping, MappingDB
 from custom_components.calendar_sync.models import SyncEvent
 
 _ids = itertools.count()
@@ -159,7 +159,28 @@ def test_google_original_flows_to_icloud_copy(env):
     assert icloud.events[uid].summary == "Pia Training neu"
     del google.events[gid]
     c._sync_once({})
+    # iCloud-Löschungen warten immer auf Freigabe
+    assert uid in icloud.events and len(c.pending_deletions) == 1
+    c._approved_keys = frozenset(f"{d.side}:{d.key}" for d in c.pending_deletions)
+    c._sync_once({})
     assert icloud.events == {}
+
+
+def test_pair_of_two_copies_follows_icloud(env):
+    # Altlast des Lösch-Bugs: Google-Kopie und iCloud-Kopie ohne echtes Original
+    c, icloud, google = env
+    google.events["g-c"] = _ev("Frauenarzt", google_id="g-c", extra={"ours": True})
+    uid = "c@calendar-sync"
+    icloud.events[uid] = _ev("Frauenarzt", icloud_uid=uid, extra={"href": "/c.ics"})
+    c._db.upsert(Mapping("g-c", uid, "/c.ics", "", "", ""))
+    icloud.events[uid] = _ev("Frauenarzt Dr. B", icloud_uid=uid, extra={"href": "/c.ics"})
+    c._sync_once({})
+    assert icloud.events[uid].summary == "Frauenarzt Dr. B"
+    assert google.events["g-c"].summary == "Frauenarzt Dr. B"
+    assert icloud.writes == []
+    del google.events["g-c"]
+    c._sync_once({})
+    assert uid in icloud.events and len(c.pending_deletions) == 1
 
 
 def test_links_restored_from_copies_after_db_loss(env):

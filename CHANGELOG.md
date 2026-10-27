@@ -2,6 +2,16 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.2.1 – Altlasten des Lösch-Bugs
+
+**Vorfall:** Der erste Lauf von v1.2.0 überschrieb beim Termin „[P] Frauenarzt“ eine Beschreibung, die nachträglich in iCloud ergänzt worden war.
+
+**Ursache:** Der Lösch-Bug bis v1.1.3 hatte das iCloud-Original durch eine Kopie der Google-Kopie ersetzt. Beide Seiten waren also Kopien. v1.2.0 hielt die Google-Seite für das Original, und die Änderung in iCloud wurde zurückgesetzt.
+
+**Fix:**
+1. Sind beide Seiten Kopien, gewinnt iCloud. Das ist die Seite, die die Familie pflegt.
+2. **Löschungen in iCloud brauchen immer eine Freigabe** unter *Reparaturen*, auch eine einzelne und unabhängig von der Löschbremse.
+
 ## 1.2.0 – Heimatseite: iCloud-Originale sind tabu
 
 **Vorfall:** Ein neu in iCloud „Familie“ angelegter Termin (23.12., „[P] Frauenarzt“) wurde gelöscht und 5 Minuten später aus der Google-Kopie neu angelegt. Erinnerungen und alle anderen Angaben, die das Tool nicht kennt, gingen verloren.
