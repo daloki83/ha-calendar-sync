@@ -25,6 +25,7 @@ from .const import (
     DELETE_RATIO_MIN_MAPPINGS,
     DOMAIN,
     EMPTY_GUARD_MIN_MAPPINGS,
+    OWN_UID_SUFFIX,
 )
 from .google_client import GoogleClient, build_credentials
 from .icloud_client import ICloudClient
@@ -40,6 +41,15 @@ def db_path_for(hass: HomeAssistant, entry_id: str) -> Path:
 
 def issue_id_for(entry_id: str) -> str:
     return f"pending_deletions_{entry_id}"
+
+
+def home_side(icloud_uid: str, google_ours: bool) -> str | None:
+    """Seite, auf der ein Termin entstanden ist. Nur von dort wird übertragen."""
+    if icloud_uid.endswith(OWN_UID_SUFFIX):
+        return "google"
+    if google_ours:
+        return "icloud"
+    return None  # zwei Originale, nur verknüpft: keine Seite wird überschrieben
 
 
 @dataclass(frozen=True)
@@ -255,17 +265,23 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                 continue
             iev = icloud_events.get(mapping.icloud_uid)
             if iev is None:
-                # In iCloud gelöscht → in Google löschen (nur geplant)
-                planned.append(PlannedDeletion(
-                    "google", gid, "", gev.summary, gev.start.isoformat()
-                ))
+                if home_side(mapping.icloud_uid, gev.extra.get("ours", False)) == "icloud":
+                    # iCloud-Original gelöscht → Google-Kopie löschen (nur geplant)
+                    planned.append(PlannedDeletion(
+                        "google", gid, "", gev.summary, gev.start.isoformat()
+                    ))
+                else:
+                    # Kopie in iCloud gelöscht: Google-Original bleibt, Kopie entsteht neu
+                    db.delete_by_google(gid)
                 continue
             self._reconcile(google, gev, iev, mapping, stats)
 
+        created_gids: set[str] = set()
         for uid, iev in icloud_events.items():
             if db.get_by_icloud(uid) is not None:
                 continue
             new_gid = google.create_event(iev)
+            created_gids.add(new_gid)
             db.upsert(Mapping(
                 google_id=new_gid, icloud_uid=uid,
                 icloud_href=iev.extra.get("href", ""),
@@ -276,10 +292,16 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             stats["created_g"] += 1
 
         for mapping in db.all():
-            if mapping.google_id in google_events:
+            # Kopien aus diesem Lauf fehlen im Google-Abruf, sind aber nicht gelöscht
+            if mapping.google_id in google_events or mapping.google_id in created_gids:
                 continue
-            if mapping.icloud_uid in icloud_events:
-                # In Google gelöscht → in iCloud löschen (nur geplant)
+            if mapping.icloud_uid in icloud_events and not mapping.icloud_uid.endswith(
+                OWN_UID_SUFFIX
+            ):
+                # Google-Kopie gelöscht: iCloud-Original bleibt, Kopie entsteht neu
+                db.delete_by_google(mapping.google_id)
+            elif mapping.icloud_uid in icloud_events:
+                # Google-Original gelöscht → iCloud-Kopie löschen (nur geplant)
                 iev = icloud_events[mapping.icloud_uid]
                 planned.append(PlannedDeletion(
                     "icloud", mapping.icloud_uid,
@@ -337,7 +359,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                 google.delete_event(d.key)
                 db.delete_by_google(d.key)
             else:
-                self._icloud.delete_event(d.href)
+                self._icloud.delete_event(d.href, d.key)
                 db.delete_by_icloud(d.key)
             stats["deleted"] += 1
         self.pending_deletions = []
@@ -353,22 +375,24 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
     ) -> None:
         g_hash = gev.content_hash()
         i_hash = iev.content_hash()
-        if g_hash == i_hash == mapping.content_hash:
+        if g_hash == i_hash:
+            return
+        home = home_side(mapping.icloud_uid, gev.extra.get("ours", False))
+        _LOGGER.debug(
+            "Reconcile '%s': g_hash=%s i_hash=%s home=%s",
+            gev.summary or iev.summary, g_hash[:8], i_hash[:8], home,
+        )
+        # Die Heimatseite gewinnt immer; überschrieben wird nur die Kopie
+        if home == "google":
+            self._icloud.update_event(mapping.icloud_href, gev, mapping.icloud_uid)
+            new_hash = g_hash
+        elif home == "icloud":
+            google.update_event(mapping.google_id, iev)
+            new_hash = i_hash
+        else:
             return
         g_time = gev.updated or datetime.now(timezone.utc)
         i_time = iev.updated or datetime.now(timezone.utc)
-        _LOGGER.debug(
-            "Reconcile '%s': g_hash=%s i_hash=%s stored=%s g_time=%s i_time=%s",
-            gev.summary or iev.summary,
-            g_hash[:8], i_hash[:8], mapping.content_hash[:8],
-            g_time, i_time,
-        )
-        if g_time >= i_time:
-            self._icloud.update_event(mapping.icloud_href, gev, mapping.icloud_uid)
-            new_hash = g_hash
-        else:
-            google.update_event(mapping.google_id, iev)
-            new_hash = i_hash
         self._open_db().upsert(Mapping(
             google_id=mapping.google_id,
             icloud_uid=mapping.icloud_uid,
@@ -394,7 +418,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
 
         mappings = self._db.all()
         google_copies = {
-            m.google_id for m in mappings if not m.icloud_uid.endswith("@calendar-sync")
+            m.google_id for m in mappings if not m.icloud_uid.endswith(OWN_UID_SUFFIX)
         }
 
         result: dict = {"dry_run": dry_run, "google": [], "icloud": []}
@@ -451,13 +475,13 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         for events in i_groups.values():
             if len(events) < 2:
                 continue
-            ours = [e for e in events if (e.icloud_uid or "").endswith("@calendar-sync")]
+            ours = [e for e in events if (e.icloud_uid or "").endswith(OWN_UID_SUFFIX)]
             originals = [e for e in events if e not in ours]
             doomed = ours if originals else ours[1:]
             for e in doomed:
                 result["icloud"].append(f"{e.summary} @ {e.start.isoformat()}")
                 if not dry_run:
-                    self._icloud.delete_event(e.extra.get("href", ""))
+                    self._icloud.delete_event(e.extra.get("href", ""), e.icloud_uid)
                     self._db.delete_by_icloud(e.icloud_uid)
 
         result["google_count"] = len(result["google"])
