@@ -224,16 +224,6 @@ class ICloudClient:
         except NotFoundError:
             pass
 
-    def delete_event_by_uid(self, uid: str) -> None:
-        """Fallback über UID-Lookup, falls kein href bekannt."""
-        assert self._calendar is not None
-        try:
-            ev = self._calendar.event_by_uid(uid)
-            href = _href_of(ev)
-            self.delete_event(href, uid)
-        except NotFoundError:
-            pass
-
     @staticmethod
     def _build_ical(ev: SyncEvent, uid: str) -> str:
         cal = Calendar()

@@ -253,7 +253,6 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             if uid not in mapped_i:
                 i_by_hash.setdefault(e.content_hash(), []).append(e)
 
-        orphans = 0
         for gid, gev in google_events.items():
             mapping = db.get_by_google(gid)
             if mapping is None:
@@ -264,7 +263,6 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                     continue
                 if gev.extra.get("ours"):
                     # Kopie ohne Original wird nie Quelle (sonst Kopien von Kopien)
-                    orphans += 1
                     continue
                 uid, href = self._icloud.create_event(gev)
                 db.upsert(Mapping(
@@ -293,7 +291,6 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             if db.get_by_icloud(uid) is not None:
                 continue
             if uid.endswith(OWN_UID_SUFFIX):
-                orphans += 1
                 continue
             new_gid = google.create_event(iev)
             created_gids.add(new_gid)
@@ -310,25 +307,18 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             # Kopien aus diesem Lauf fehlen im Google-Abruf, sind aber nicht gelöscht
             if mapping.google_id in google_events or mapping.google_id in created_gids:
                 continue
-            if mapping.icloud_uid in icloud_events and not mapping.icloud_uid.endswith(
-                OWN_UID_SUFFIX
-            ):
-                # Google-Kopie gelöscht: iCloud-Original bleibt, Kopie entsteht neu
-                db.delete_by_google(mapping.google_id)
-            elif mapping.icloud_uid in icloud_events:
+            iev = icloud_events.get(mapping.icloud_uid)
+            if iev is not None and mapping.icloud_uid.endswith(OWN_UID_SUFFIX):
                 # Google-Original gelöscht → iCloud-Kopie löschen (nur geplant)
-                iev = icloud_events[mapping.icloud_uid]
                 planned.append(PlannedDeletion(
                     "icloud", mapping.icloud_uid,
                     iev.extra.get("href") or mapping.icloud_href,
                     iev.summary, iev.start.isoformat(),
                 ))
             else:
-                # Auf beiden Seiten weg: nur die Zuordnung aufräumen
+                # Google-Kopie gelöscht (Original bleibt, Kopie entsteht neu) oder beide weg
                 db.delete_by_google(mapping.google_id)
 
-        if orphans:
-            _LOGGER.debug("%d Kopie(n) ohne Original übersprungen", orphans)
         self._apply_deletions(db, google, planned, mapped_count, initialized, stats)
         db.set_meta("initialized", "1")
         return stats
@@ -402,22 +392,10 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         # Die Heimatseite gewinnt immer; überschrieben wird nur die Kopie
         if home == "google":
             self._icloud.update_event(mapping.icloud_href, gev, mapping.icloud_uid)
-            new_hash = g_hash
         elif home == "icloud":
             google.update_event(mapping.google_id, iev)
-            new_hash = i_hash
         else:
             return
-        g_time = gev.updated or datetime.now(timezone.utc)
-        i_time = iev.updated or datetime.now(timezone.utc)
-        self._open_db().upsert(Mapping(
-            google_id=mapping.google_id,
-            icloud_uid=mapping.icloud_uid,
-            icloud_href=mapping.icloud_href,
-            google_updated=_iso(g_time),
-            icloud_updated=_iso(i_time),
-            content_hash=new_hash,
-        ))
         stats["updated"] += 1
 
     async def async_remove_duplicates(self, dry_run: bool) -> dict:
