@@ -2,6 +2,24 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.1.3 – Absturz von Home Assistant behoben
+
+**Fehlerbild:** Ab v1.1.1 stürzte Home Assistant etwa stündlich ab (Exit-Code 139, Segfault). Laut Crash-Protokoll stand ein Thread in `MappingDB.get_meta`, während ein anderer `MappingDB.close` ausführte.
+
+**Ursache:** Der stündliche Google-Token-Refresh ändert den Config-Eintrag. Das löste den Update-Listener aus, und der lud den Eintrag komplett neu. Beim Entladen wurde die SQLite-Verbindung geschlossen, während der gerade gestartete Sync sie noch nutzte.
+
+**Fix:**
+1. Neu geladen wird nur noch, wenn sich die Optionen wirklich ändern.
+2. Sync, Duplikat-Bereinigung und das Schließen der DB laufen nacheinander unter einem Lock. Das Entladen wartet also auf einen laufenden Sync.
+
+## 1.1.2 – Diagnose
+
+*Diagnose herunterladen* zeigt, welche Felder iCloud pro Termin mitliefert.
+
+## 1.1.1 – Sync-Intervall
+
+Ohne Entitäten hatte der Coordinator keinen Listener, deshalb plante HA keine Intervall-Läufe ein. Ein leerer Listener hält das Intervall jetzt am Leben.
+
 ## 1.1.0 – Löschschutz
 
 **Vorfall:** Nach dem Einrichten eines zweiten Eintrags (gleicher iCloud-Kalender „Familie“, neuer, leerer Google-Kalender) löschte der erste Lauf 38 Termine aus dem iCloud-Kalender. Wiederhergestellt über iCloud.com → Kalender wiederherstellen.
