@@ -109,6 +109,7 @@ class GoogleClient:
             end = datetime.fromisoformat(end_raw["dateTime"].replace("Z", "+00:00"))
             tz_name = start_raw.get("timeZone", "") or end_raw.get("timeZone", "")
         updated = datetime.fromisoformat(item["updated"].replace("Z", "+00:00"))
+        private = item.get("extendedProperties", {}).get("private", {})
         return SyncEvent(
             summary=item.get("summary", ""),
             start=start,
@@ -121,9 +122,9 @@ class GoogleClient:
             updated=updated,
             google_id=item["id"],
             extra={
-                "ours": item.get("extendedProperties", {})
-                .get("private", {})
-                .get("calendar_sync") == "1"
+                "ours": private.get("calendar_sync") == "1",
+                # UID des iCloud-Originals (Kopien ab v1.2)
+                "source": private.get("source_uid", ""),
             },
         )
 
@@ -172,5 +173,7 @@ class GoogleClient:
         }
         if ev.recurrence:
             body["recurrence"] = list(ev.recurrence)
-        body["extendedProperties"] = {"private": {"calendar_sync": "1"}}
+        body["extendedProperties"] = {
+            "private": {"calendar_sync": "1", "source_uid": ev.icloud_uid or ""}
+        }
         return body

@@ -230,6 +230,20 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         stats = {"created_g": 0, "created_i": 0, "updated": 0, "deleted": 0, "matched": 0}
         planned: list[PlannedDeletion] = []
 
+        # Kopien tragen ihr Original in sich: fehlende Zuordnungen daraus wiederherstellen
+        for gid, gev in google_events.items():
+            src = gev.extra.get("source", "")
+            if (gev.extra.get("ours") and src in icloud_events
+                    and db.get_by_google(gid) is None and db.get_by_icloud(src) is None):
+                _link(db, gev, icloud_events[src])
+                stats["matched"] += 1
+        for uid, iev in icloud_events.items():
+            src = iev.extra.get("source", "")
+            if (uid.endswith(OWN_UID_SUFFIX) and src in google_events
+                    and db.get_by_icloud(uid) is None and db.get_by_google(src) is None):
+                _link(db, google_events[src], iev)
+                stats["matched"] += 1
+
         # Ungemappte iCloud-Events nach Inhalt indexieren, damit identische
         # Termine verknüpft statt kopiert werden (verhindert Duplikate nach
         # Kalenderwechsel / leerer Mapping-DB).
@@ -239,20 +253,18 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             if uid not in mapped_i:
                 i_by_hash.setdefault(e.content_hash(), []).append(e)
 
+        orphans = 0
         for gid, gev in google_events.items():
             mapping = db.get_by_google(gid)
             if mapping is None:
                 twins = i_by_hash.get(gev.content_hash())
                 if twins:
-                    iev = twins.pop(0)
-                    db.upsert(Mapping(
-                        google_id=gid, icloud_uid=iev.icloud_uid,
-                        icloud_href=iev.extra.get("href", ""),
-                        google_updated=_iso(gev.updated),
-                        icloud_updated=_iso(iev.updated),
-                        content_hash=gev.content_hash(),
-                    ))
+                    _link(db, gev, twins.pop(0))
                     stats["matched"] += 1
+                    continue
+                if gev.extra.get("ours"):
+                    # Kopie ohne Original wird nie Quelle (sonst Kopien von Kopien)
+                    orphans += 1
                     continue
                 uid, href = self._icloud.create_event(gev)
                 db.upsert(Mapping(
@@ -279,6 +291,9 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         created_gids: set[str] = set()
         for uid, iev in icloud_events.items():
             if db.get_by_icloud(uid) is not None:
+                continue
+            if uid.endswith(OWN_UID_SUFFIX):
+                orphans += 1
                 continue
             new_gid = google.create_event(iev)
             created_gids.add(new_gid)
@@ -312,6 +327,8 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                 # Auf beiden Seiten weg: nur die Zuordnung aufräumen
                 db.delete_by_google(mapping.google_id)
 
+        if orphans:
+            _LOGGER.debug("%d Kopie(n) ohne Original übersprungen", orphans)
         self._apply_deletions(db, google, planned, mapped_count, initialized, stats)
         db.set_meta("initialized", "1")
         return stats
@@ -491,6 +508,16 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             dry_run, result["google_count"], result["icloud_count"],
         )
         return result
+
+
+def _link(db: MappingDB, gev: SyncEvent, iev: SyncEvent) -> None:
+    db.upsert(Mapping(
+        google_id=gev.google_id, icloud_uid=iev.icloud_uid,
+        icloud_href=iev.extra.get("href", ""),
+        google_updated=_iso(gev.updated),
+        icloud_updated=_iso(iev.updated),
+        content_hash=gev.content_hash(),
+    ))
 
 
 def _iso(dt: datetime | None) -> str:
