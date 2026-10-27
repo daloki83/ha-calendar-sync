@@ -198,7 +198,7 @@ Seit v1.1 schützen mehrere Stufen davor, dass versehentlich viele Termine gelö
 | **Zuordnung pro Eintrag** | Jeder Eintrag hat eine eigene Zuordnungsliste, gebunden an genau sein Kalenderpaar. Ein neuer oder geänderter Eintrag erbt nie fremde Zuordnungen. |
 | **Erster Lauf** | Der erste Lauf eines Eintrags (oder nach einem Kalenderwechsel) verknüpft und legt an, löscht aber nie. |
 | **Leerer Kalender** | Liefert eine Seite 0 Termine, obwohl mindestens 3 zugeordnet sind, bricht der Lauf ab, ohne etwas zu ändern. |
-| **Löschbremse** | Würde ein Lauf mehr als 5 Termine (einstellbar) oder mehr als 20 % aller zugeordneten Termine löschen, wird **nichts** gelöscht. Anlegen und Ändern laufen normal weiter. |
+| **Löschbremse** | Würde ein Lauf mehr als 5 Termine (einstellbar) oder mehr als 20 % aller zugeordneten Termine löschen, wird **nichts** gelöscht. Anlegen und Ändern laufen normal weiter. **Löschungen in iCloud brauchen immer eine Freigabe**, auch eine einzelne. |
 | **Doppelt belegter Kalender** | Beim Einrichten erscheint eine Warnung, wenn ein Kalender schon von einem anderen Eintrag genutzt wird. Fortfahren nur mit Bestätigung. |
 
 **Wenn die Löschbremse greift:**
@@ -517,7 +517,7 @@ Since v1.1, several layers protect against accidentally deleting many events:
 | **Mappings per entry** | Each entry has its own mapping list, bound to exactly its calendar pair. A new or changed entry never inherits someone else's mappings. |
 | **First run** | The first run of an entry (or after a calendar switch) links and creates, but never deletes. |
 | **Empty calendar** | If one side returns 0 events although at least 3 are mapped, the run aborts without changing anything. |
-| **Deletion brake** | If a run would delete more than 5 events (configurable) or more than 20 % of all mapped events, **nothing** is deleted. Creating and updating keep working. |
+| **Deletion brake** | If a run would delete more than 5 events (configurable) or more than 20 % of all mapped events, **nothing** is deleted. Creating and updating keep working. **Deletions in iCloud always need approval**, even a single one. |
 | **Calendar used twice** | During setup, a warning appears if a calendar is already used by another entry. You can only continue after confirming. |
 
 **When the deletion brake kicks in:**
