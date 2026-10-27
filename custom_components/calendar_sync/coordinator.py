@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -86,6 +87,9 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             entry.options.get(CONF_DELETE_THRESHOLD, DEFAULT_DELETE_THRESHOLD)
         )
         self._db: MappingDB | None = None
+        self._db_lock = threading.Lock()
+        # Stand bei Setup – der Update-Listener lädt nur bei Änderung neu
+        self.options = dict(entry.options)
         self.pending_deletions: list[PlannedDeletion] = []
         self._approved_keys: frozenset[str] = frozenset()
 
@@ -100,7 +104,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             await self._oauth.async_ensure_token_valid()
             token_data = self._oauth.token
             stats = await self.hass.async_add_executor_job(
-                self._sync_once, token_data
+                self._locked, self._sync_once, token_data
             )
         except Exception as err:
             raise UpdateFailed(f"Sync fehlgeschlagen: {err}") from err
@@ -156,7 +160,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
                 else:
                     db.delete_by_icloud(d.key)
 
-        await self.hass.async_add_executor_job(_drop)
+        await self.hass.async_add_executor_job(self._locked, _drop)
         self.pending_deletions = []
         self._approved_keys = frozenset()
         await self.async_refresh()
@@ -164,11 +168,17 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
     async def async_shutdown(self) -> None:  # type: ignore[override]
         await super().async_shutdown()
         if self._db is not None:
-            await self.hass.async_add_executor_job(self._db.close)
+            # wartet, bis ein laufender Sync fertig ist
+            await self.hass.async_add_executor_job(self._locked, self._db.close)
 
     # ------------------------------------------------------------------
     #  Blockierender Teil
     # ------------------------------------------------------------------
+    def _locked(self, func, *args):
+        # Sync, Bereinigung und close() nie gleichzeitig auf derselben Verbindung
+        with self._db_lock:
+            return func(*args)
+
     def _open_db(self) -> MappingDB:
         if self._db is None:
             self._db = MappingDB(self._db_path)
@@ -372,7 +382,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
     async def async_remove_duplicates(self, dry_run: bool) -> dict:
         await self._oauth.async_ensure_token_valid()
         return await self.hass.async_add_executor_job(
-            self._dedupe, self._oauth.token, dry_run
+            self._locked, self._dedupe, self._oauth.token, dry_run
         )
 
     def _dedupe(self, token_data: dict, dry_run: bool) -> dict:

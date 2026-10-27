@@ -93,6 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Lade den Eintrag neu, wenn Optionen sich ändern."""
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    # Der stündliche Token-Refresh ändert entry.data – dafür kein Reload mitten im Sync
+    if coordinator is not None and entry.options == coordinator.options:
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 
