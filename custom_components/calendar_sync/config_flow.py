@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntry, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow, selector
 
@@ -64,6 +64,16 @@ class CalendarSyncOAuth2FlowHandler(
             "prompt": "consent",
         }
 
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is None:
+            return self.async_show_form(step_id="reauth_confirm")
+        return await self.async_step_user()
+
     async def async_oauth_create_entry(
         self, data: dict[str, Any]
     ) -> ConfigFlowResult:
@@ -72,6 +82,11 @@ class CalendarSyncOAuth2FlowHandler(
         `data` enthält hier bereits {"auth_implementation": ..., "token": {...}}.
         Wir reichen den ganzen Block zum Eintrag weiter.
         """
+        if self.source == SOURCE_REAUTH:
+            # Nur das neue Google-Token tauschen, iCloud und Kalenderwahl bleiben
+            return self.async_update_reload_and_abort(
+                self._get_reauth_entry(), data_updates=data
+            )
         self._token_data = data
         try:
             self._google_calendars = await self.hass.async_add_executor_job(

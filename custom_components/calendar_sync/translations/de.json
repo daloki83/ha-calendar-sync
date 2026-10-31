@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "reauth_confirm": {
+        "title": "Google neu verbinden",
+        "description": "Der Zugriff auf Google ist abgelaufen oder wurde widerrufen. Melde dich bei Google erneut an. iCloud und die Kalenderwahl bleiben unverändert."
+      },
       "pick_implementation": {
         "title": "Google verbinden",
         "description": "Wähle die Google-OAuth-Credentials, die zuvor unter 'Anwendungs-Zugangsdaten' hinterlegt wurden."
@@ -31,6 +35,7 @@
       "calendar_in_use": "Einer dieser Kalender wird schon vom Eintrag „{conflict}“ synchronisiert. Zwei Einträge auf demselben Kalender können sich gegenseitig Termine anlegen oder löschen. Empfehlung: den anderen Eintrag erst entfernen. Zum Fortfahren unten bestätigen."
     },
     "abort": {
+      "reauth_successful": "Google wurde neu verbunden",
       "already_configured": "Diese Kalender-Kombination ist bereits eingerichtet",
       "google_fetch_failed": "Google-Kalender konnten nicht abgerufen werden",
       "missing_configuration": "Google-OAuth-Credentials fehlen – siehe README",

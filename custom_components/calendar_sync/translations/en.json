@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "reauth_confirm": {
+        "title": "Reconnect Google",
+        "description": "Access to Google has expired or was revoked. Sign in to Google again. iCloud and the calendar selection stay unchanged."
+      },
       "pick_implementation": {
         "title": "Connect Google",
         "description": "Select the Google OAuth credentials you set up under 'Application Credentials'."
@@ -31,6 +35,7 @@
       "calendar_in_use": "One of these calendars is already synced by the entry \"{conflict}\". Two entries on the same calendar can create or delete each other's events. Recommendation: remove the other entry first. Confirm below to continue."
     },
     "abort": {
+      "reauth_successful": "Google was reconnected",
       "already_configured": "This calendar combination is already configured",
       "google_fetch_failed": "Could not fetch Google calendars",
       "missing_configuration": "Google OAuth credentials missing – see README",

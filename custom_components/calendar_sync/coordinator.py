@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers import issue_registry as ir
@@ -117,6 +118,8 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
             stats = await self.hass.async_add_executor_job(
                 self._locked, self._sync_once, token_data
             )
+        except ConfigEntryAuthFailed:
+            raise  # startet die erneute Anmeldung statt eines stillen Fehlers
         except Exception as err:
             raise UpdateFailed(f"Sync fehlgeschlagen: {err}") from err
 

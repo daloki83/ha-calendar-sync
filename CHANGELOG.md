@@ -2,6 +2,14 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.2.2 – Google neu verbinden
+
+**Fehlerbild:** „Einrichtungsfehler: Anmeldedaten sind ungültig, erneute Authentifizierung erforderlich“, aber kein Weg, sich neu anzumelden.
+
+**Ursache:** Google hatte das Refresh-Token widerrufen oder es war abgelaufen. Die Integration hatte keinen Reauth-Schritt, deshalb bot HA keine Anmeldung an. Fehler beim Token-Refresh im laufenden Betrieb wurden außerdem als normaler Sync-Fehler verschluckt.
+
+**Fix:** Neuer Reauth-Dialog („Neu konfigurieren“). Er tauscht nur das Google-Token; iCloud, Kalenderwahl und Zuordnungen bleiben. Auth-Fehler im Sync starten die erneute Anmeldung.
+
 ## 1.2.1 – Altlasten des Lösch-Bugs
 
 **Vorfall:** Der erste Lauf von v1.2.0 überschrieb bei einem Termin eine Beschreibung, die nachträglich in iCloud ergänzt worden war.
