@@ -39,7 +39,8 @@ Die Integration bringt eigene Clients für Google und iCloud mit und ist unabhä
 | Serien (RRULE, RDATE, EXDATE) | ✅ | ✅ |
 | Zeitzone (sommerzeitsicher) | ✅ | ✅ |
 | Neu anlegen / ändern / löschen | ✅ | ✅ |
-| Teilnehmer, Erinnerungen, Anhänge, Farben | ❌ | ❌ |
+| Erinnerungen (höchstens 5, in Google als Pop-up) | ✅ | ✅ |
+| Teilnehmer, Anhänge, Farben | ❌ | ❌ |
 | Einzeln geänderte Termine einer Serie | ❌ | ❌ |
 
 - **Heimatseite:** Jeder Termin gehört der Seite, auf der er entstanden ist, und nur von dort wird übertragen. Änderungen an der Kopie werden beim nächsten Lauf vom Original überschrieben. **In iCloud angelegte Termine ändert oder löscht die Integration nie**; wird ihre Google-Kopie gelöscht, entsteht sie neu.
@@ -300,7 +301,8 @@ Für Details pro Termin: Integration → **⋮** → **Debug-Protokollierung akt
 ## 12. Grenzen
 
 - Einzeln geänderte Termine einer Serie („diesen Montag 1 h später") werden nicht übertragen; ausgelassene Termine (EXDATE) schon.
-- Teilnehmer, Erinnerungen, Anhänge und Farben werden nicht synchronisiert.
+- Teilnehmer, Anhänge und Farben werden nicht synchronisiert.
+- Erinnerungen: Die Kopie folgt immer dem Original. Google erlaubt höchstens 5 Erinnerungen bis 4 Wochen vorher und keine nach Beginn: „am Tag um 9:00“ (ganztägig, iOS) wird zur Erinnerung um 0:00 Uhr. Ortsbezogene Erinnerungen werden nicht übertragen.
 - Es wird gepollt (Standard 5 Minuten), kein Echtzeit-Push.
 - iCloud-CalDAV ist nicht offiziell dokumentiert; Apple kann das Verhalten ändern.
 - Ein Eintrag synchronisiert genau ein Kalenderpaar. Für mehrere Paare weitere Einträge anlegen.
@@ -358,7 +360,8 @@ The integration ships its own Google and iCloud clients and is independent of Ho
 | Recurring events (RRULE, RDATE, EXDATE) | ✅ | ✅ |
 | Timezone (DST-safe) | ✅ | ✅ |
 | Create / update / delete | ✅ | ✅ |
-| Attendees, reminders, attachments, colors | ❌ | ❌ |
+| Reminders (up to 5, pop-up in Google) | ✅ | ✅ |
+| Attendees, attachments, colors | ❌ | ❌ |
 | Single modified instances of a series | ❌ | ❌ |
 
 - **Home side:** Every event belongs to the side it was created on, and only that side is synced from. Changes to the copy are overwritten by the original on the next run. **Events created in iCloud are never changed or deleted by the integration**; if their Google copy is deleted, it is recreated.
@@ -619,7 +622,8 @@ For per-event detail: Integration → **⋮** → **Enable debug logging**.
 ## 12. Limitations
 
 - Single modified instances of a series ("this Monday 1 h later") are not transferred; skipped instances (EXDATE) are.
-- Attendees, reminders, attachments and colors are not synced.
+- Attendees, attachments and colors are not synced.
+- Reminders: the copy always follows the original. Google allows up to 5 reminders, up to 4 weeks ahead, and none after the start: "on the day at 9:00" (all-day, iOS) becomes a reminder at 0:00. Location-based reminders are not synced.
 - The integration polls (default every 5 minutes); no real-time push.
 - iCloud CalDAV is not officially documented; Apple can change the behavior.
 - One entry syncs exactly one pair of calendars. For more pairs, add more entries.

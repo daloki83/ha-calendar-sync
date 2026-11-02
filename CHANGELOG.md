@@ -2,6 +2,17 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.3.0 – Erinnerungen
+
+Erinnerungen werden jetzt mit übertragen, nach der Heimatseiten-Regel: Das Original bestimmt, die Kopie folgt.
+
+1. **iCloud → Google** und **Google → iCloud**, als Minuten vor Beginn. Standard-Erinnerungen eines Google-Kalenders zählen als echte Erinnerungen des Originals.
+2. **Kopien spiegeln exakt:** Hat das Original keine Erinnerung, hat die Kopie auch keine. Eine in einer Kopie geänderte Erinnerung wird zurückgesetzt.
+3. **Erster Lauf nach dem Update** gleicht alle Kopien an. Originale bleiben unverändert.
+4. **Doppelte Termine** werden weiter nur über den Inhalt erkannt, Erinnerungen zählen dort nicht.
+
+**Grenzen (Google):** höchstens 5 Erinnerungen, höchstens 4 Wochen vorher, in Google nur als Pop-up, keine Erinnerung nach Beginn. Die iOS-Option für ganztägige Termine „am Tag um 9:00“ wird deshalb zu einer Erinnerung bei Beginn, also um 0:00 Uhr. Ortsbezogene Erinnerungen werden nicht übertragen. Erinnerungen gelten in Google nur für das verbundene Konto.
+
 ## 1.2.2 – Google neu verbinden
 
 **Fehlerbild:** „Einrichtungsfehler: Anmeldedaten sind ungültig, erneute Authentifizierung erforderlich“, aber kein Weg, sich neu anzumelden.

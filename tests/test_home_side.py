@@ -43,7 +43,8 @@ class FakeICloud:
     def create_event(self, ev):
         uid = f"copy-{next(_ids)}@calendar-sync"
         self.events[uid] = _ev(
-            ev.summary, icloud_uid=uid, extra={"href": f"/{uid}.ics", "source": ev.google_id}
+            ev.summary, icloud_uid=uid, reminders=ev.reminders,
+            extra={"href": f"/{uid}.ics", "source": ev.google_id},
         )
         self.writes.append(("create", uid))
         return uid, f"/{uid}.ics"
@@ -51,7 +52,8 @@ class FakeICloud:
     def update_event(self, href, ev, uid):
         _ensure_own(uid)
         self.events[uid] = _ev(
-            ev.summary, icloud_uid=uid, extra={"href": href, "source": ev.google_id}
+            ev.summary, icloud_uid=uid, reminders=ev.reminders,
+            extra={"href": href, "source": ev.google_id},
         )
         self.writes.append(("update", uid))
 
@@ -76,13 +78,15 @@ class FakeGoogle:
     def create_event(self, ev):
         gid = f"g-{next(_ids)}"
         self.events[gid] = _ev(
-            ev.summary, google_id=gid, extra={"ours": True, "source": ev.icloud_uid}
+            ev.summary, google_id=gid, reminders=ev.reminders,
+            extra={"ours": True, "source": ev.icloud_uid},
         )
         return gid
 
     def update_event(self, gid, ev):
         self.events[gid] = _ev(
-            ev.summary, google_id=gid, extra={"ours": True, "source": ev.icloud_uid}
+            ev.summary, google_id=gid, reminders=ev.reminders,
+            extra={"ours": True, "source": ev.icloud_uid},
         )
 
     def delete_event(self, gid):

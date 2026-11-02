@@ -391,7 +391,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
     ) -> None:
         g_hash = gev.content_hash()
         i_hash = iev.content_hash()
-        if g_hash == i_hash:
+        if g_hash == i_hash and gev.reminders == iev.reminders:
             return
         home = home_side(mapping.icloud_uid, gev.extra.get("ours", False))
         _LOGGER.debug(

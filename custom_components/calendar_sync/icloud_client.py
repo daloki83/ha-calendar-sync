@@ -13,13 +13,13 @@ from urllib.parse import urlparse
 
 import caldav
 from caldav.lib.error import NotFoundError
-from icalendar import Calendar, Event
+from icalendar import Alarm, Calendar, Event, vDatetime
 
 from .const import ICLOUD_CALDAV_URL, OWN_UID_SUFFIX
 
 # Kopien tragen die Google-ID ihres Originals in diesem Feld
 SOURCE_PROP = "X-CALSYNC-SOURCE"
-from .models import SyncEvent
+from .models import SyncEvent, normalize_reminders
 
 
 def _ensure_own(uid: str) -> None:
@@ -63,6 +63,40 @@ def _extract_recurrence(comp) -> list[str]:
             except Exception:
                 out.append(f"{name}:{p}")
     return out
+
+
+# icalendar bis 6.x verwirft den ganzen Termin bei TRIGGER;VALUE=DATE-TIME (iOS: ortsbezogene
+# Erinnerungen). Ein fehlender Termin gilt als gelöscht, daher vor dem Parsen umbenennen.
+_ABSOLUTE_TRIGGER = re.compile(r"^TRIGGER;[^:\r\n]*VALUE=DATE-TIME[^:\r\n]*:", re.IGNORECASE | re.MULTILINE)
+_ABSOLUTE_PROP = "X-CALSYNC-ABSOLUTE-TRIGGER"
+
+
+def _extract_reminders(comp, start: datetime, end: datetime, own: bool) -> list[int]:
+    """Minuten vor Beginn je VALARM."""
+    minutes: list[int] = []
+    for alarm in comp.walk("VALARM"):
+        # Ein fehlerhafter Alarm darf nie den Termin kosten: fehlt er im Abruf, gilt er als gelöscht
+        try:
+            if str(alarm.get("ACTION", "")).upper() == "NONE":
+                continue
+            # Standard-Erinnerung, die Apple selbst an unsere Kopie hängt, ist keine Abweichung
+            if own and str(alarm.get("X-APPLE-DEFAULT-ALARM", "")).upper() == "TRUE":
+                continue
+            absolute = alarm.get(_ABSOLUTE_PROP)
+            if absolute is not None:
+                at = vDatetime.from_ical(str(absolute))
+                trigger = (at if at.tzinfo else at.replace(tzinfo=timezone.utc)) - start
+            else:
+                prop = alarm["TRIGGER"]
+                trigger = prop.dt
+                if prop.params.get("RELATED") == "END":
+                    trigger += end - start
+            # shortcut: Google kennt keine Erinnerung nach Beginn (iOS ganztägig „am Tag um 9:00“),
+            # sie wird zur Erinnerung bei Beginn. Bessere Abbildung erst, wenn Google sie erlaubt.
+            minutes.append(max(0, round(-trigger.total_seconds() / 60)))
+        except (AttributeError, KeyError, TypeError, ValueError) as err:
+            _LOGGER.warning("iCloud-Erinnerung übersprungen: %s", err)
+    return normalize_reminders(minutes)
 
 
 def _href_of(dav_event) -> str:
@@ -122,7 +156,7 @@ class ICloudClient:
 
     @staticmethod
     def _parse(dav_event) -> SyncEvent:
-        cal = Calendar.from_ical(dav_event.data)
+        cal = Calendar.from_ical(_ABSOLUTE_TRIGGER.sub(f"{_ABSOLUTE_PROP}:", dav_event.data))
         for comp in cal.walk("VEVENT"):
             dtstart = comp.get("DTSTART").dt
             dtend_prop = comp.get("DTEND")
@@ -143,6 +177,7 @@ class ICloudClient:
             start_prop = comp.get("DTSTART")
             if start_prop is not None:
                 tz_name = start_prop.params.get("TZID", "") or ""
+            uid = str(comp.get("UID"))
             return SyncEvent(
                 summary=str(comp.get("SUMMARY") or ""),
                 start=dtstart,
@@ -152,8 +187,9 @@ class ICloudClient:
                 description=str(comp.get("DESCRIPTION") or ""),
                 recurrence=recurrence,
                 timezone=tz_name,
+                reminders=_extract_reminders(comp, dtstart, dtend, uid.endswith(OWN_UID_SUFFIX)),
                 updated=updated,
-                icloud_uid=str(comp.get("UID")),
+                icloud_uid=uid,
                 # Google-ID des Originals (Kopien ab v1.2)
                 extra={
                     "href": _href_of(dav_event),
@@ -251,6 +287,12 @@ class ICloudClient:
             vevent.add("description", ev.description)
         if ev.google_id:
             vevent.add(SOURCE_PROP, ev.google_id)
+        for minutes in ev.reminders:
+            alarm = Alarm()
+            alarm.add("action", "DISPLAY")
+            alarm.add("description", ev.summary or "Erinnerung")
+            alarm.add("trigger", timedelta(minutes=-minutes))
+            vevent.add_component(alarm)
         vevent.add("dtstamp", datetime.now(timezone.utc))
         vevent.add("last-modified", datetime.now(timezone.utc))
         cal.add_component(vevent)

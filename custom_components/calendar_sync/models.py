@@ -21,6 +21,9 @@ class SyncEvent:
     recurrence: list[str] = field(default_factory=list)
     # IANA-TZ-Name der Quelle (z. B. "Europe/Berlin"), leer für UTC/Floating.
     timezone: str = ""
+    # Erinnerungen in Minuten vor Beginn, kanonisch (siehe normalize_reminders).
+    # Bewusst nicht im content_hash: Zwillinge werden weiter nur über den Inhalt erkannt.
+    reminders: list[int] = field(default_factory=list)
     # Zeitpunkt der letzten Änderung auf der Quellseite (UTC)
     updated: datetime | None = None
     # Herkunfts-IDs (eine davon ist gesetzt, je nach Quelle)
@@ -41,6 +44,14 @@ class SyncEvent:
             ]
         )
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def normalize_reminders(minutes) -> list[int]:
+    """Google erlaubt höchstens 5 Erinnerungen bis 4 Wochen vorher.
+
+    Beide Seiten nutzen dieselbe Form, sonst gälte ein Termin dauerhaft als geändert.
+    """
+    return sorted({m for m in minutes if 0 <= m <= 40320})[:5]
 
 
 def _norm_str(s: str) -> str:

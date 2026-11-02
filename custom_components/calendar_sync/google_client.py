@@ -13,7 +13,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 from .const import OAUTH_SCOPES
-from .models import SyncEvent
+from .models import SyncEvent, normalize_reminders
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class GoogleClient:
             ).execute()
             for item in resp.get("items", []):
                 try:
-                    out.append(self._parse(item))
+                    out.append(self._parse(item, resp.get("defaultReminders", [])))
                 except Exception as err:  # pragma: no cover
                     _LOGGER.warning("Google-Event-Parse: %s", err)
             page_token = resp.get("nextPageToken")
@@ -95,7 +95,7 @@ class GoogleClient:
         return out
 
     @staticmethod
-    def _parse(item: dict) -> SyncEvent:
+    def _parse(item: dict, default_reminders: list[dict] | None = None) -> SyncEvent:
         start_raw = item["start"]
         end_raw = item["end"]
         if "date" in start_raw:
@@ -110,6 +110,8 @@ class GoogleClient:
             tz_name = start_raw.get("timeZone", "") or end_raw.get("timeZone", "")
         updated = datetime.fromisoformat(item["updated"].replace("Z", "+00:00"))
         private = item.get("extendedProperties", {}).get("private", {})
+        reminders = item.get("reminders", {})
+        active = (default_reminders or []) if reminders.get("useDefault") else reminders.get("overrides", [])
         return SyncEvent(
             summary=item.get("summary", ""),
             start=start,
@@ -119,6 +121,7 @@ class GoogleClient:
             description=item.get("description", ""),
             recurrence=list(item.get("recurrence", [])),
             timezone=tz_name,
+            reminders=normalize_reminders(r["minutes"] for r in active),
             updated=updated,
             google_id=item["id"],
             extra={
@@ -169,6 +172,11 @@ class GoogleClient:
             "summary": ev.summary,
             "location": ev.location,
             "description": ev.description,
+            # Explizit, sonst bekäme die Kopie die Standard-Erinnerungen des Kalenders
+            "reminders": {
+                "useDefault": False,
+                "overrides": [{"method": "popup", "minutes": m} for m in ev.reminders],
+            },
             **body_time,
         }
         if ev.recurrence:
