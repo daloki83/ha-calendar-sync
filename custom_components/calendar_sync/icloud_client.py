@@ -71,6 +71,10 @@ _ABSOLUTE_TRIGGER = re.compile(r"^TRIGGER;[^:\r\n]*VALUE=DATE-TIME[^:\r\n]*:", r
 _ABSOLUTE_PROP = "X-CALSYNC-ABSOLUTE-TRIGGER"
 
 
+def parse_ical(data: str) -> Calendar:
+    return Calendar.from_ical(_ABSOLUTE_TRIGGER.sub(f"{_ABSOLUTE_PROP}:", data))
+
+
 def _extract_reminders(comp, start: datetime, end: datetime, own: bool) -> list[int]:
     """Minuten vor Beginn je VALARM."""
     minutes: list[int] = []
@@ -156,7 +160,7 @@ class ICloudClient:
 
     @staticmethod
     def _parse(dav_event) -> SyncEvent:
-        cal = Calendar.from_ical(_ABSOLUTE_TRIGGER.sub(f"{_ABSOLUTE_PROP}:", dav_event.data))
+        cal = parse_ical(dav_event.data)
         for comp in cal.walk("VEVENT"):
             dtstart = comp.get("DTSTART").dt
             dtend_prop = comp.get("DTEND")

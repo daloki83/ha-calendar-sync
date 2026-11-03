@@ -81,7 +81,6 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
         self._entry = entry
         self._oauth = oauth_session
         self._db_path = db_path_for(hass, entry.entry_id)
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._icloud_calendar = entry.options.get(
             CONF_ICLOUD_CALENDAR, entry.data[CONF_ICLOUD_CALENDAR]
@@ -195,6 +194,7 @@ class CalendarSyncCoordinator(DataUpdateCoordinator[dict]):
 
     def _open_db(self) -> MappingDB:
         if self._db is None:
+            self._db_path.parent.mkdir(parents=True, exist_ok=True)
             self._db = MappingDB(self._db_path)
         return self._db
 

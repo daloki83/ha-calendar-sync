@@ -5,12 +5,12 @@ from datetime import datetime, timedelta, timezone
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from icalendar import Calendar
 
 from .const import DOMAIN
+from .icloud_client import parse_ical
 
-# Felder, deren Inhalt hilft, einen Ersteller zu erkennen
-_SHOW_VALUE = ("ORGANIZER", "ATTENDEE", "CREATED", "LAST-MODIFIED", "DTSTAMP")
+# Nur Zeitstempel: Diagnosen landen in öffentlichen Issues, alle anderen Felder nur als Name
+_SHOW_VALUE = ("CREATED", "LAST-MODIFIED", "DTSTAMP")
 
 
 async def async_get_config_entry_diagnostics(
@@ -28,12 +28,12 @@ def _icloud_fields(icloud) -> dict:
     end = datetime.now(timezone.utc) + timedelta(days=365)
     events = []
     for ev in icloud._calendar.search(start=start, end=end, event=True, expand=False):
-        for comp in Calendar.from_ical(ev.data).walk("VEVENT"):
+        for comp in parse_ical(ev.data).walk("VEVENT"):
             props = {}
             for name, value in comp.property_items(recursive=False):
                 if name in ("BEGIN", "END"):
                     continue
-                if name in _SHOW_VALUE or name.startswith("X-"):
+                if name in _SHOW_VALUE:
                     props.setdefault(name, []).append(
                         value.to_ical().decode(errors="replace")
                         if hasattr(value, "to_ical") else str(value)

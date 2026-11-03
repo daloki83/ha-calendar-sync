@@ -2,6 +2,12 @@
 
 Entstehungsgeschichte der Integration, damit Entscheidungen und Fehlerbilder später nachvollziehbar sind.
 
+## 1.3.1 – HACS-Review
+
+1. **Diagnose ohne personenbezogene Daten:** Sie enthielt die Inhalte von `ORGANIZER`, `ATTENDEE` und allen `X-*`-Feldern, also Namen, E-Mail-Adressen, Adressen und GPS-Koordinaten. Inhalte zeigt sie nur noch für `CREATED`, `LAST-MODIFIED` und `DTSTAMP`, alle anderen Felder nur als Name. Eine Diagnose-Datei aus v1.1.2 bis v1.3.0 sollte nicht geteilt werden.
+2. **Kein Dateizugriff mehr in der Event-Loop:** Der Ordner der Zuordnungs-DB wird im Executor angelegt.
+3. **Diagnose liest auch Termine mit Erinnerungen zu festem Zeitpunkt.**
+
 ## 1.3.0 – Erinnerungen
 
 Erinnerungen werden jetzt mit übertragen, nach der Heimatseiten-Regel: Das Original bestimmt, die Kopie folgt.
